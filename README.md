@@ -35,21 +35,20 @@ UtilityAI system named *ALS_Combined_BP*. I handled that part for you and left *
 8. UALSMantleComponent now has a variable that lets you toggle binding to the jump key. 
 9. Exposed some action events in AALSBaseCharacter to Blueprint
 10. UALSCharacterAnimInstance has a new variable called *bIsHumanCharacter* = true. If this is false, the animation instance will terminate 
-NativeUpdateAnimation() early, skipping the calls 	
+NativeUpdateAnimation() early, skipping the calls UpdateAimingValues(DeltaSeconds); UpdateLayerValues(); UpdateFootIK(DeltaSeconds); and all other update functions. Set bIsHumanCharacter to false if you want to possess a non human character (like a car) but still use the ALS controller.
 
-    UpdateAimingValues(DeltaSeconds);
-	
-    UpdateLayerValues();
-	
-    UpdateFootIK(DeltaSeconds); 
-
-    and all other update functions. 
-
-Set bIsHumanCharacter to false if you want to possess a non human character (like a car) but still use the ALS controller.
 11. Added three new overlay states. EALSOverlayState::MeleeOneHand, EALSOverlayState::MeleeAndShield, EALSOverlayState::MeleeTwoHand
+
+
 12. Edited FALSOverlayState to account for the new overlay states. *ALS_Combined_BP* handles my changes.  
+
 13. Modified GetMantleAsset() in the BP child of UALSMantleComponent to account for the new overlay states. 
+
 14. *ALS_Combined_AnimBP* has an upperbody slot, for montages that you only want to play on the upperbody.
+
+15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) There shouldn't
+be any dependencies YET, BUT I will add working menus in the future. Install this in the Plugins folder if I accidently left a dependency. 
+
 
 
 # EULA:
