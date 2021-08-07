@@ -63,3 +63,5 @@ This plugin contains animations from Paragon assets retargeted to the manniquin.
 This plugin contains animations from Advanced Locomotion System. This are subject to Ue4's EULA and Epic's EULA. 
 
 Free, have fun.
+
+License: MIT license. 
