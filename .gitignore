@@ -106,7 +106,7 @@ DerivedDataCache/*
 *.code-workspace
 
 
-**/Plugins/UINavigation/**
+#**/Plugins/UINavigation/**
 #!**/Plugins/UINavigation/Source/
 
 **/CSC/**
