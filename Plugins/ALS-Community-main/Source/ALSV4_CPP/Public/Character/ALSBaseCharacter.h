@@ -419,6 +419,9 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "ALS|Contol")
 	void StancePressedAction();
 
+	UFUNCTION(BlueprintCallable, Category = "ALS|Contol")
+	void StanceReleasedAction();
+
 	void WalkPressedAction();
 
 	void RagdollPressedAction();
@@ -456,6 +459,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "ALS|Input")
 	EALSStance DesiredStance = EALSStance::Standing;
 
+	/*
+	If true, double tap to roll
+	If false, croutch if stance key is held, roll if lightly tapped. (Still use RollDoubleTapTimeout)
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ALS|Input")
+	bool bDefaultStanceBehavior = true;
+
 	UPROPERTY(EditDefaultsOnly, Category = "ALS|Input", BlueprintReadOnly)
 	float LookUpDownRate = 1.25f;
 
@@ -464,6 +474,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "ALS|Input", BlueprintReadOnly)
 	float RollDoubleTapTimeout = 0.3f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "ALS|Input", BlueprintReadOnly)
+	float StanceReleasedTime = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "ALS|Input", BlueprintReadOnly)
 	float ViewModeSwitchHoldTime = 0.2f;

@@ -55,6 +55,7 @@ void AALSBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 	PlayerInputComponent->BindAction("JumpAction", IE_Pressed, this, &AALSBaseCharacter::JumpPressedAction);
 	PlayerInputComponent->BindAction("JumpAction", IE_Released, this, &AALSBaseCharacter::JumpReleasedAction);
 	PlayerInputComponent->BindAction("StanceAction", IE_Pressed, this, &AALSBaseCharacter::StancePressedAction);
+	PlayerInputComponent->BindAction("StanceAction", IE_Released, this, &AALSBaseCharacter::StanceReleasedAction);
 	PlayerInputComponent->BindAction("WalkAction", IE_Pressed, this, &AALSBaseCharacter::WalkPressedAction);
 	PlayerInputComponent->BindAction("RagdollAction", IE_Pressed, this, &AALSBaseCharacter::RagdollPressedAction);
 	PlayerInputComponent->BindAction("SelectRotationMode_1", IE_Pressed, this,
@@ -1437,37 +1438,87 @@ void AALSBaseCharacter::StancePressedAction()
 	const float PrevStanceInputTime = LastStanceInputTime;
 	LastStanceInputTime = World->GetTimeSeconds();
 
-	if (LastStanceInputTime - PrevStanceInputTime <= RollDoubleTapTimeout)
+	if(bDefaultStanceBehavior)
 	{
-		// Roll
-		Replicated_PlayMontage(GetRollAnimation(), 1.15f);
+		if (LastStanceInputTime - PrevStanceInputTime <= RollDoubleTapTimeout)
+		{
+			// Roll
+			Replicated_PlayMontage(GetRollAnimation(), 1.15f);
 
-		if (Stance == EALSStance::Standing)
-		{
-			SetDesiredStance(EALSStance::Crouching);
+			if (Stance == EALSStance::Standing)
+			{
+				SetDesiredStance(EALSStance::Crouching);
+			}
+			else if (Stance == EALSStance::Crouching)
+			{
+				SetDesiredStance(EALSStance::Standing);
+			}
+			return;
 		}
-		else if (Stance == EALSStance::Crouching)
+
+		if (MovementState == EALSMovementState::Grounded)
 		{
-			SetDesiredStance(EALSStance::Standing);
+			if (Stance == EALSStance::Standing)
+			{
+				SetDesiredStance(EALSStance::Crouching);
+				Crouch();
+			}
+			else if (Stance == EALSStance::Crouching)
+			{
+				SetDesiredStance(EALSStance::Standing);
+				UnCrouch();
+			}
 		}
-		return;
+
+		// Notice: MovementState == EALSMovementState::InAir case is removed
 	}
-
-	if (MovementState == EALSMovementState::Grounded)
+	else 
 	{
-		if (Stance == EALSStance::Standing)
+		/*
+		if (StanceReleasedTime - LastStanceInputTime  <= RollDoubleTapTimeout)
+		{
+			
+		}
+		else if(Gait != EALSGait::Sprinting && Gait != EALSGait::Running)
 		{
 			SetDesiredStance(EALSStance::Crouching);
 			Crouch();
 		}
+		*/
+	}
+}
+
+void AALSBaseCharacter::StanceReleasedAction()
+{
+	UWorld* World = GetWorld();
+	check(World);
+	StanceReleasedTime = World->GetTimeSeconds();
+	
+	if(!bDefaultStanceBehavior)
+	{
+		
+		if (StanceReleasedTime - LastStanceInputTime  <= RollDoubleTapTimeout)
+		{
+			Replicated_PlayMontage(GetRollAnimation(), 1.15f);
+		}
+		else if (Stance == EALSStance::Standing && Gait != EALSGait::Sprinting && Gait != EALSGait::Running)
+		{
+			//SetDesiredStance(EALSStance::Crouching);
+			//Crouch();
+		}
 		else if (Stance == EALSStance::Crouching)
 		{
+			
 			SetDesiredStance(EALSStance::Standing);
 			UnCrouch();
+			
 		}
+		
+		
+		
+	
+		
 	}
-
-	// Notice: MovementState == EALSMovementState::InAir case is removed
 }
 
 void AALSBaseCharacter::WalkPressedAction()
