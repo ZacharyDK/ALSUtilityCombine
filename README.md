@@ -11,6 +11,14 @@ Standalone Github for my UtilityAI System: https://github.com/ZacharyDK/UtilityC
 
 My Standalone UtilityAI System Documentation: https://docs.google.com/document/d/1XkaUs4PwrAyDM_PV1cD-ulRLw5Ykb_6LmlaFsxnZIcQ/edit?usp=sharing 
 
+# Installation
+
+1. Install Homebrew
+2. brew install git-lfs 
+3. Create a folder to hold the repo
+4. change your current directory to said folder
+5. git clone https://github.com/ZacharyDK/ALSUtilityCombine 
+
 # Notes:
 
 This sample project combines my UtilityAI system with the community version of the ALS plugin. 
