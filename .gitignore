@@ -84,7 +84,7 @@ DerivedDataCache/*
 **/Intermediate/**
 
 **/GalacticLeopard/**
-**/Maps/**
+#**/Maps/**
 **/Megascans/**
 **/MSPresets/**
 **/Polar/**
