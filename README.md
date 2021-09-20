@@ -57,7 +57,17 @@ NativeUpdateAnimation() early, skipping the calls UpdateAimingValues(DeltaSecond
 15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) There shouldn't
 be any dependencies YET, BUT I will add working menus in the future. Install this in the Plugins folder if I accidently left a dependency. 
 
+# TODO:
 
+Look, the major integration steps are done, so you can use this plugin with ALS. But there are some finishing touches I want to put on.
+
+1. Finish status effects testing (i.e make sure integration complete and working as intended)
+2. Making the AI AIM (using the Anims from ALS )
+3. Making the AI Sprint ()
+4. HUD integration. (UtilityAI hud should be mostly fine)
+5. Full menus. (Main menu, pause menu, maybe server select. )
+6. Make/include .cs files for server builds. For ease of use.
+7. Video show case. 
 
 # EULA:
 
