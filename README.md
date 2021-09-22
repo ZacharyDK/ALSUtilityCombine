@@ -11,6 +11,8 @@ Standalone Github for my UtilityAI System: https://github.com/ZacharyDK/UtilityC
 
 My Standalone UtilityAI System Documentation: https://docs.google.com/document/d/1XkaUs4PwrAyDM_PV1cD-ulRLw5Ykb_6LmlaFsxnZIcQ/edit?usp=sharing 
 
+Documentation: https://docs.google.com/document/d/1XkaUs4PwrAyDM_PV1cD-ulRLw5Ykb_6LmlaFsxnZIcQ/edit#
+
 # Installation
 
 You need to have git LFS set up to download this repo properly. 
