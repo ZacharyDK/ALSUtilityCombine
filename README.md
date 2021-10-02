@@ -58,8 +58,7 @@ NativeUpdateAnimation() early, skipping the calls UpdateAimingValues(DeltaSecond
 
 14. *ALS_Combined_AnimBP* has an upperbody slot, for montages that you only want to play on the upperbody.
 
-15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) There shouldn't
-be any dependencies YET, BUT I will add working menus in the future. Install this in the Plugins folder if I accidently left a dependency. 
+15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) Dependencies added.
 
 # TODO:
 
