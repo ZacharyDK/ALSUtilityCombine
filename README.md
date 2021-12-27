@@ -60,6 +60,8 @@ NativeUpdateAnimation() early, skipping the calls UpdateAimingValues(DeltaSecond
 
 15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) Dependencies added.
 
+
+
 # TODO:
 
 Look, the major integration steps are done, so you can use this plugin with ALS. But there are some finishing touches I want to put on.
