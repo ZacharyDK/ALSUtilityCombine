@@ -43,7 +43,8 @@ void UMeleeMontageComponent::BeginPlay()
 void UMeleeMontageComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorld()->GetTimerManager().ClearTimer(AutoFireHandle);
-	//GetWorld()->GetTimerManager().ClearTimer(BurstFireHandle);
+	GetWorld()->GetTimerManager().ClearAllTimersForObject(this); //Clears anonymous timer handles generated in PlayCollectionMontageSequence()
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -161,6 +162,7 @@ bool UMeleeMontageComponent::CanPlayMontageData(const FMeleeMontageCollectionDat
 }
 
 
+
 TArray<TSoftObjectPtr<UAnimMontage>> UMeleeMontageComponent::GetMontageListFromCollection(UPARAM(ref)const TArray<FMeleeMontageCollectionData>& CollectionArray) const
 {
 	TArray<TSoftObjectPtr<UAnimMontage>> OutList = {};
@@ -233,6 +235,38 @@ void UMeleeMontageComponent::PlayCollectionMontage(const FMeleeMontageCollection
 			}
 		}
 
+	}
+}
+
+void UMeleeMontageComponent::PlayCollectionMontageSequence(UPARAM(ref) TArray<FMeleeMontageCollectionData>& Montages)
+{
+	float TimeSum = 0.0f;
+
+	for (const FMeleeMontageCollectionData& MontageCollection : Montages)
+	{
+		UAnimMontage* Mont= MontageCollection.SoftMontage.Get();
+		if(!Mont)
+		{
+			continue;
+		}
+		float Playrate = MontageCollection.MontagePlayrate;
+		if(Playrate <= 0.0f) //deal with divide by zero
+		{
+			Playrate = 1.0f;
+		}
+
+		float MontLength = Mont->CalculateSequenceLength();
+
+		float MontPlayTime = MontLength/Playrate;
+		TimeSum = TimeSum + MontPlayTime;
+
+		FTimerDelegate AnonDelegate;
+		AnonDelegate.BindUFunction(this,FName("PlayCollectionMontage"),MontageCollection);
+		
+		FTimerHandle AnonHandle;
+		WorldTimerManager->SetTimer(AnonHandle,AnonDelegate,TimeSum,false);
+
+	
 	}
 }
 
