@@ -210,8 +210,7 @@ void UMeleeMontageComponent::PlayCollectionMontage(const FMeleeMontageCollection
 
 	if(bPass)
 	{	
-		LastMontagePlayed = MontageCollectionData.SoftMontage.Get();
-		PlayMontage(MontageCollectionData.SoftMontage.Get(),MontageCollectionData.MontagePlayrate,MontageCollectionData.MontageStartSectionName);
+
 
 		if(MontageCollectionData.InterruptOtherMontages)
 		{
@@ -235,10 +234,13 @@ void UMeleeMontageComponent::PlayCollectionMontage(const FMeleeMontageCollection
 			}
 		}
 
+		//This should be here oopps.
+		LastMontagePlayed = MontageCollectionData.SoftMontage.Get();
+		PlayMontage(MontageCollectionData.SoftMontage.Get(),MontageCollectionData.MontagePlayrate,MontageCollectionData.MontageStartSectionName);
 	}
 }
 
-void UMeleeMontageComponent::PlayCollectionMontageSequence(UPARAM(ref) TArray<FMeleeMontageCollectionData>& Montages)
+float UMeleeMontageComponent::PlayCollectionMontageSequence(UPARAM(ref) TArray<FMeleeMontageCollectionData>& Montages)
 {
 	float TimeSum = 0.0f;
 
@@ -255,10 +257,16 @@ void UMeleeMontageComponent::PlayCollectionMontageSequence(UPARAM(ref) TArray<FM
 			Playrate = 1.0f;
 		}
 
-		float MontLength = Mont->CalculateSequenceLength();
+		float MontLength = Mont->SequenceLength;
 
 		float MontPlayTime = MontLength/Playrate;
-		TimeSum = TimeSum + MontPlayTime;
+		
+		if(TimeSum <= 0.0f)
+		{
+			PlayCollectionMontage(MontageCollection);
+			TimeSum = TimeSum + MontPlayTime;
+			continue;
+		}
 
 		FTimerDelegate AnonDelegate;
 		AnonDelegate.BindUFunction(this,FName("PlayCollectionMontage"),MontageCollection);
@@ -266,8 +274,10 @@ void UMeleeMontageComponent::PlayCollectionMontageSequence(UPARAM(ref) TArray<FM
 		FTimerHandle AnonHandle;
 		WorldTimerManager->SetTimer(AnonHandle,AnonDelegate,TimeSum,false);
 
+		TimeSum = TimeSum + MontPlayTime;
 	
 	}
+	return TimeSum;
 }
 
 void UMeleeMontageComponent::PlayNextMontage()

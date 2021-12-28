@@ -221,8 +221,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Montage)
 	void PlayCollectionMontage(UPARAM(ref) const FMeleeMontageCollectionData& MontageCollectionData);
 
+	/*
+	Plays a list of Montages one after another, in order
+	returns the total time
+	*/
 	UFUNCTION(BlueprintCallable, Category = Montage)
-	void PlayCollectionMontageSequence(UPARAM(ref) TArray<FMeleeMontageCollectionData>& Montages);
+	float PlayCollectionMontageSequence(UPARAM(ref) TArray<FMeleeMontageCollectionData>& Montages);
 
 	/*
 	Calls server RPC if the OwnerChar is a ROLE_AutonomousProxy
