@@ -91,6 +91,20 @@ void UALSCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		return;
 	}
 
+	if(bUpdateLayerValues)
+	{
+		UpdateLayerValues();
+	}
+
+	if(bUpdateFootIK)
+	{
+		UpdateFootIK(DeltaSeconds);
+	}	
+
+	if(!bUpdateMovementStateChecks)
+	{
+		return;
+	}
 	UpdateAimingValues(DeltaSeconds);
 	UpdateLayerValues();
 	UpdateFootIK(DeltaSeconds);
@@ -286,8 +300,29 @@ void UALSCharacterAnimInstance::UpdateLayerValues()
 	// Get the Aim Offset weight by getting the opposite of the Aim Offset Mask.
 	LayerBlendingValues.EnableAimOffset = FMath::Lerp(1.0f, 0.0f, GetCurveValue(NAME_Mask_AimOffset));
 	// Set the Base Pose weights
-	LayerBlendingValues.BasePose_N = GetCurveValue(NAME_BasePose_N);
+
+	//Fix Blinking bug when BasePose_N not defined. https://www.youtube.com/watch?v=n6tYMXAegHA
+	
+	TMap< FName, float > InOutCurveList = {};
+
+	AppendAnimationCurveList(EAnimCurveType::AttributeCurve,InOutCurveList);
+
+	//Let me add override overlay state....
+	if(InOutCurveList.Contains(NAME_BasePose_N))
+	{
+		LayerBlendingValues.BasePose_N = GetCurveValue(NAME_BasePose_N);
+	}
+	else
+	{
+		LayerBlendingValues.BasePose_N = 1; //One fixes the blink, but it blends it with something else. And I don't know why how to fix that. 
+	}
+	
+
+
+	//LayerBlendingValues.BasePose_N = GetCurveValue(NAME_BasePose_N);
 	LayerBlendingValues.BasePose_CLF = GetCurveValue(NAME_BasePose_CLF);
+
+	
 	// Set the Additive amount weights for each body part
 	LayerBlendingValues.Spine_Add = GetCurveValue(NAME_Layering_Spine_Add);
 	LayerBlendingValues.Head_Add = GetCurveValue(NAME_Layering_Head_Add);

@@ -37,8 +37,20 @@ public:
 
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 
+	/*
+	Skip Update Layer Values, update foot IK, and MovementState checks if false
+	*/
 	UPROPERTY(EditAnywhere, Category = "ALS|Custom")
 	bool bIsHumanCharacter = true;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bIsHumanCharacter"), Category = "ALS|Custom")
+	bool bUpdateLayerValues = true;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bIsHumanCharacter"), Category = "ALS|Custom")
+	bool bUpdateFootIK = true;
+
+	UPROPERTY(EditAnywhere, meta = (EditCondition = "bIsHumanCharacter"), Category = "ALS|Custom")
+	bool bUpdateMovementStateChecks = true;
 
 	UFUNCTION(BlueprintCallable, Category = "ALS|Animation")
 	void PlayTransition(const FALSDynamicMontageParams& Parameters);
