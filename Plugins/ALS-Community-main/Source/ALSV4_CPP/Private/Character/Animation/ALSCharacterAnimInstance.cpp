@@ -101,13 +101,19 @@ void UALSCharacterAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		UpdateFootIK(DeltaSeconds);
 	}	
 
+	UpdateAimingValues(DeltaSeconds);
+	
 	if(!bUpdateMovementStateChecks)
 	{
 		return;
 	}
-	UpdateAimingValues(DeltaSeconds);
+	
+	
+	/*
+
 	UpdateLayerValues();
 	UpdateFootIK(DeltaSeconds);
+	*/
 
 	if (MovementState.Grounded())
 	{

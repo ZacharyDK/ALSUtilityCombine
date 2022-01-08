@@ -95,6 +95,7 @@ DerivedDataCache/*
 **/UI/Textures/**
 **/UI/MyIcons/**
 
+**/Plugins/ParagonMinAnim/** 
 #**/Plugins/ALS_Community-main/**
 #!**/Plugins/ALS_Community-main/Source/**
 #!**/Plugins/ALS_Community-main/Source/
@@ -121,3 +122,4 @@ DerivedDataCache/*
 **/ToolShedVOL1/**
 **/Underground/**
 **/AncientTreasures/**
+**/ParagonMinions/**
