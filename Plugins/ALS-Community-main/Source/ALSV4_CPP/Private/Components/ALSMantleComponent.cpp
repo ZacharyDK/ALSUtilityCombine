@@ -105,15 +105,8 @@ void UALSMantleComponent::MantleStart(float MantleHeight, const FALSComponentAnd
 	MantleParams.AnimMontage = MantleAsset.AnimMontage;
 	MantleParams.PositionCorrectionCurve = MantleAsset.PositionCorrectionCurve;
 	MantleParams.StartingOffset = MantleAsset.StartingOffset;
-	MantleParams.StartingPosition = FMath::GetMappedRangeValueClamped({MantleAsset.LowHeight, MantleAsset.HighHeight},
-	                                                                  {
-		                                                                  MantleAsset.LowStartPosition,
-		                                                                  MantleAsset.HighStartPosition
-	                                                                  },
-	                                                                  MantleHeight);
-	MantleParams.PlayRate = FMath::GetMappedRangeValueClamped({MantleAsset.LowHeight, MantleAsset.HighHeight},
-	                                                          {MantleAsset.LowPlayRate, MantleAsset.HighPlayRate},
-	                                                          MantleHeight);
+	MantleParams.StartingPosition = FMath::GetMappedRangeValueClamped(FVector2D{MantleAsset.LowHeight, MantleAsset.HighHeight}, FVector2D{MantleAsset.LowStartPosition, MantleAsset.HighStartPosition}, MantleHeight);
+	MantleParams.PlayRate = FMath::GetMappedRangeValueClamped(FVector2D{MantleAsset.LowHeight, MantleAsset.HighHeight}, FVector2D{MantleAsset.LowPlayRate, MantleAsset.HighPlayRate}, MantleHeight);
 
 	// Step 2: Convert the world space target to the mantle component's local space for use in moving objects.
 	MantleLedgeLS.Component = MantleLedgeWS.Component;
