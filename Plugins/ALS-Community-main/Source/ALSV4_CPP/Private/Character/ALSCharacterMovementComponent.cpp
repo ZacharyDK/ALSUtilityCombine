@@ -168,15 +168,15 @@ float UALSCharacterMovementComponent::GetMappedSpeed() const
 
 	if (Speed > LocRunSpeed)
 	{
-		return FMath::GetMappedRangeValueClamped({LocRunSpeed, LocSprintSpeed}, {2.0f, 3.0f}, Speed);
+		return FMath::GetMappedRangeValueClamped(FVector2D{LocRunSpeed, LocSprintSpeed}, FVector2D{2.0f, 3.0f}, Speed);
 	}
 
 	if (Speed > LocWalkSpeed)
 	{
-		return FMath::GetMappedRangeValueClamped({LocWalkSpeed, LocRunSpeed}, {1.0f, 2.0f}, Speed);
+		return FMath::GetMappedRangeValueClamped(FVector2D{LocWalkSpeed, LocRunSpeed}, FVector2D{1.0f, 2.0f}, Speed);
 	}
 
-	return FMath::GetMappedRangeValueClamped({0.0f, LocWalkSpeed}, {0.0f, 1.0f}, Speed);
+	return FMath::GetMappedRangeValueClamped(FVector2D{0.0f, LocWalkSpeed}, FVector2D{0.0f, 1.0f}, Speed);
 }
 
 void UALSCharacterMovementComponent::SetMovementSettings(FALSMovementSettings NewMovementSettings)
