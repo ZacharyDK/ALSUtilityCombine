@@ -43,10 +43,6 @@ public:
 
 	Otherwise, I call the super function
 
-	NOTE:
-	ALSAICOntroller now inherits from this class. This variable will have no effect
-	on that class.
-
 	*/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = FocusSettings)
 	float FocusEyeHeight = 80.0f;

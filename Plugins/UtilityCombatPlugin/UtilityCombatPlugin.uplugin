@@ -20,7 +20,7 @@
 			"Name": "UtilityCombatPlugin",
 			"Type": "Runtime",
 			"LoadingPhase": "PreDefault",
-			"WhitelistPlatforms": [ "Win64", "Win32", "Mac", "IOS", "Android" ]
+			"WhitelistPlatforms": [ "Win64", "Mac", "IOS", "Android" ]
 		}
 	]
 }

@@ -241,7 +241,7 @@ public:
 	FTimerManager* WorldTimerManager = nullptr;
 
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = Initialize)
 	void Initialize();
 
 	FRotator AddRandomSpreadToRotation(const FRotator InputRotation) const;
@@ -276,7 +276,7 @@ public:
 	UFUNCTION(Server,Reliable)
 	void FireLineTraceServer(const FVector StartLocation, const FRotator InitialRotation) const;
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category = Basic)
 	void FirePattern();
 
 

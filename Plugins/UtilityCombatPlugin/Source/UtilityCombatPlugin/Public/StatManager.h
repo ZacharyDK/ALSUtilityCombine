@@ -25,16 +25,16 @@ struct FStatOperation
 {
 	GENERATED_BODY();
 	
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = StatOperation)
 	FName StatName = FName("");
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = StatOperation)
 	float Value = 0.0f;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = StatOperation)
 	EStatValueType ValueType = EStatValueType::CurrentValue;
 
-	UPROPERTY(EditAnywhere,BlueprintReadWrite)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite, Category = StatOperation)
 	EStatModificationOperation StatOperation = EStatModificationOperation::Addition;
 
 	FStatOperation(FName InputName, float InputValue,EStatValueType InputValueType = EStatValueType::CurrentValue, EStatModificationOperation InputStatOperation = EStatModificationOperation::Addition)
