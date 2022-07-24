@@ -14,12 +14,12 @@
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
-	"EngineVersion": "5.0.0",
+	"EngineVersion": "5.0",
 	"Modules": [
 		{
 			"Name": "UtilityCombatPlugin",
 			"Type": "Runtime",
-			"LoadingPhase": "PreDefault",
+			"LoadingPhase": "Default",
 			"WhitelistPlatforms": [ "Win64", "Mac", "IOS", "Android" ]
 		}
 	]
