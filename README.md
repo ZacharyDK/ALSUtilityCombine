@@ -60,7 +60,13 @@ NativeUpdateAnimation() early, skipping the calls UpdateAimingValues(DeltaSecond
 
 15. I was messing around with the *UINavigationPlugin* (Link: https://www.unrealengine.com/marketplace/en-US/product/uinavigation) Dependencies added.
 
+# 5.1 Status
+Working on it. Getting build errors, related to Xcode 14. (Mac not valid platform, QFE)
+I'll get UE on my windows computer. 
 
+If you try to use this plugin with versions prior to 5.0. You will bet build errors related to the names of target platforms. You can view how the names changed in the migration guide, and fix as needed.
+
+https://docs.unrealengine.com/5.0/en-US/unreal-engine-5-migration-guide/ 
 
 # TODO:
 
