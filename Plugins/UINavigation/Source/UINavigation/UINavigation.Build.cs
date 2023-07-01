@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 using UnrealBuildTool;
 using System.IO;
@@ -15,7 +15,8 @@ public class UINavigation : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core"
+				"Core",
+				"EnhancedInput"
 			}
 			);
 			
@@ -23,13 +24,16 @@ public class UINavigation : ModuleRules
 			new string[]
 			{
 				"CoreUObject",
+				"ApplicationCore",
 				"Engine",
                 "UMG",
                 "Slate",
                 "SlateCore",
                 "InputCore",
+                "EnhancedInput",
                 "RHI",
-                "HeadMountedDisplay"
+                "HeadMountedDisplay",
+				"AssetRegistry"
 			}
 			);
 		
@@ -38,7 +42,5 @@ public class UINavigation : ModuleRules
 			{
 			}
 			);
-
-		PrecompileForTargets = PrecompileTargetsType.Any;
 	}
 }

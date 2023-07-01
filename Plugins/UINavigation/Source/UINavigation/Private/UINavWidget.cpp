@@ -11,6 +11,7 @@
 #include "UINavPCComponent.h"
 #include "UINavPCReceiver.h"
 #include "UINavPromptWidget.h"
+#include "UINavSettings.h"
 #include "UINavWidgetComponent.h"
 #include "UINavBlueprintFunctionLibrary.h"
 #include "UINavMacros.h"
@@ -28,6 +29,11 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/UniformGridSlot.h"
 #include "Components/ActorComponent.h"
+#include "Components/ListView.h"
+#include "Sound/SoundBase.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/ViewportSplitScreen.h"
+#include "Curves/CurveFloat.h"
 #if IS_VR_PLATFORM
 #include "HeadMountedDisplayFunctionLibrary.h"
 #endif
@@ -35,7 +41,7 @@
 UUINavWidget::UUINavWidget(const FObjectInitializer& ObjectInitializer)
 	:Super(ObjectInitializer)
 {
-	bIsFocusable = true;
+	SetIsFocusable(true);
 }
 
 void UUINavWidget::NativeConstruct()
@@ -48,7 +54,7 @@ void UUINavWidget::NativeConstruct()
 	}
 	if (World != nullptr)
 	{
-		if (UGameViewportClient* ViewportClient = World->GetGameViewport())
+		if (const UGameViewportClient* ViewportClient = World->GetGameViewport())
 		{
 			bUsingSplitScreen = ViewportClient->GetCurrentSplitscreenConfiguration() != ESplitScreenType::None;
 		}
@@ -87,10 +93,10 @@ void UUINavWidget::NativeConstruct()
 		ReturnedFromWidget = nullptr;
 	}
 
+	Super::NativeConstruct();
+
 	PreSetup(!bCompletedSetup);
 	InitialSetup();
-
-	Super::NativeConstruct();
 }
 
 void UUINavWidget::InitialSetup(const bool bRebuilding)
@@ -134,8 +140,6 @@ void UUINavWidget::InitialSetup(const bool bRebuilding)
 	if (!IsSelectorValid())
 	{
 		UINavSetup();
-		bShouldTick = false;
-		return;
 	}
 	else
 	{
@@ -153,15 +157,11 @@ void UUINavWidget::ReconfigureSetup()
 	if (!IsSelectorValid())
 	{
 		UINavSetup();
-		return;
 	}
 	else
 	{
 		SetupSelector();
 	}
-
-	bShouldTick = true;
-	WaitForTick = 0;
 
 	for (UUINavWidget* ChildUINavWidget : ChildUINavWidgets)
 	{
@@ -185,7 +185,7 @@ void UUINavWidget::CleanSetup()
 
 void UUINavWidget::FetchButtonsInHierarchy()
 {
-	TraverseHierarquy(this, this);
+	TraverseHierarchy(this, this);
 
 	const int ButtonsNum = UINavButtons.Num();
 	if (FirstButtonIndex >= ButtonsNum && ButtonsNum > 0)
@@ -240,7 +240,7 @@ void UUINavWidget::ConfigureUINavPC()
 	}
 }
 
-void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* WidgetToTraverse)
+void UUINavWidget::TraverseHierarchy(UUINavWidget* UINavWidget, UUserWidget* WidgetToTraverse)
 {
 	//Find UINavButtons in the widget hierarchy
 	TArray<UWidget*> Widgets;
@@ -261,13 +261,13 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 				const UUniformGridSlot* GridSlot = Cast<UUniformGridSlot>(Widget->Slot);
 				if (GridSlot != nullptr)
 				{
-					if (LastGrid.DimensionX < GridSlot->Column + 1)
+					if (LastGrid.DimensionX < GridSlot->GetColumn() + 1)
 					{
-						LastGrid.DimensionX = GridSlot->Column + 1;
+						LastGrid.DimensionX = GridSlot->GetColumn() + 1;
 					}
-					if (LastGrid.DimensionY < GridSlot->Row + 1)
+					if (LastGrid.DimensionY < GridSlot->GetRow() + 1)
 					{
-						LastGrid.DimensionY = GridSlot->Row + 1;
+						LastGrid.DimensionY = GridSlot->GetRow() + 1;
 					}
 				}
 			}
@@ -281,10 +281,10 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 			if (ScrollBox != nullptr)
 			{
 				UINavWidget->ScrollBoxes.Add(ScrollBox);
-				if (ScrollBox->GetFName().ToString().Left(4).Equals(TEXT("UIN_")))
+				if (WidgetHasUINPrefix(ScrollBox))
 				{
 					if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
-					const bool bIsHorizontal = ScrollBox->Orientation == EOrientation::Orient_Horizontal;
+					const bool bIsHorizontal = ScrollBox->GetOrientation() == EOrientation::Orient_Horizontal;
 					UINavWidget->GridIndexMap.Add(ScrollBox, UINavWidget->NavigationGrids.Num());
 					GridDepth = UINavWidget->GetWidgetHierarchyDepth(ScrollBox);
 					UINavWidget->Add1DGrid(bIsHorizontal ? EGridType::Horizontal : EGridType::Vertical, nullptr, UINavWidget->NavigationGrids.Num(), 0, FButtonNavigation(), true);
@@ -300,59 +300,50 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 			}
 			
 			UHorizontalBox * HorizontalBox = Cast<UHorizontalBox>(Panel);
-			if (HorizontalBox != nullptr)
+			if (HorizontalBox != nullptr && WidgetHasUINPrefix(HorizontalBox))
 			{
-				if (HorizontalBox->GetFName().ToString().Left(4).Equals(TEXT("UIN_")))
+				if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
+				UINavWidget->GridIndexMap.Add(HorizontalBox, UINavWidget->NavigationGrids.Num());
+				GridDepth = UINavWidget->GetWidgetHierarchyDepth(HorizontalBox);
+				UINavWidget->Add1DGrid(EGridType::Horizontal, nullptr, UINavWidget->NavigationGrids.Num(), 0, FButtonNavigation(), true);
+				if (TraversingCollection != nullptr)
 				{
-					if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
-					UINavWidget->GridIndexMap.Add(HorizontalBox, UINavWidget->NavigationGrids.Num());
-					GridDepth = UINavWidget->GetWidgetHierarchyDepth(HorizontalBox);
-					UINavWidget->Add1DGrid(EGridType::Horizontal, nullptr, UINavWidget->NavigationGrids.Num(), 0, FButtonNavigation(), true);
-					if (TraversingCollection != nullptr)
-					{
-						TraversingCollection->IncrementGridCount();
-					}
+					TraversingCollection->IncrementGridCount();
 				}
 			}
 			else
 			{
 				UVerticalBox* VerticalBox = Cast<UVerticalBox>(Panel);
-				if (VerticalBox != nullptr)
+				if (VerticalBox != nullptr && WidgetHasUINPrefix(VerticalBox))
 				{
-					if (VerticalBox->GetFName().ToString().Left(4).Equals(TEXT("UIN_")))
+					if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
+					UINavWidget->GridIndexMap.Add(VerticalBox, UINavWidget->NavigationGrids.Num());
+					GridDepth = UINavWidget->GetWidgetHierarchyDepth(VerticalBox);
+					UINavWidget->Add1DGrid(EGridType::Vertical, nullptr, UINavWidget->NavigationGrids.Num(), 0, FButtonNavigation(), true);
+					if (TraversingCollection != nullptr)
 					{
-						if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
-						UINavWidget->GridIndexMap.Add(VerticalBox, UINavWidget->NavigationGrids.Num());
-						GridDepth = UINavWidget->GetWidgetHierarchyDepth(VerticalBox);
-						UINavWidget->Add1DGrid(EGridType::Vertical, nullptr, UINavWidget->NavigationGrids.Num(), 0, FButtonNavigation(), true);
-						if (TraversingCollection != nullptr)
-						{
-							TraversingCollection->IncrementGridCount();
-						}
+						TraversingCollection->IncrementGridCount();
 					}
 				}
 				else
 				{
 					UUniformGridPanel* GridPanel = Cast<UUniformGridPanel>(Panel);
-					if (GridPanel != nullptr)
+					if (GridPanel != nullptr && WidgetHasUINPrefix(GridPanel))
 					{
-						if (GridPanel->GetFName().ToString().Left(4).Equals(TEXT("UIN_")))
+						if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
+						UINavWidget->GridIndexMap.Add(GridPanel, UINavWidget->NavigationGrids.Num());
+						GridDepth = UINavWidget->GetWidgetHierarchyDepth(GridPanel);
+						UINavWidget->NavigationGrids.Add(FGrid(EGridType::Grid2D,
+													nullptr,
+													UINavWidget->NavigationGrids.Num(),
+													0,
+													0,
+													FButtonNavigation(),
+													true,
+													0));
+						if (TraversingCollection != nullptr)
 						{
-							if (!UINavWidget->bAutoAppended) UINavWidget->bAutoAppended = true;
-							UINavWidget->GridIndexMap.Add(GridPanel, UINavWidget->NavigationGrids.Num());
-							GridDepth = UINavWidget->GetWidgetHierarchyDepth(GridPanel);
-							UINavWidget->NavigationGrids.Add(FGrid(EGridType::Grid2D,
-														nullptr,
-														UINavWidget->NavigationGrids.Num(),
-														0,
-														0,
-														FButtonNavigation(),
-														true,
-														0));
-							if (TraversingCollection != nullptr)
-							{
-								TraversingCollection->IncrementGridCount();
-							}
+							TraversingCollection->IncrementGridCount();
 						}
 					}
 				}
@@ -371,8 +362,12 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 		{
 			Collection->ParentWidget = UINavWidget;
 			Collection->ParentCollection = Cast<UUINavCollection>(WidgetToTraverse);
-			Collection->Init(UINavWidget->UINavButtons.Num());
 			UINavWidget->UINavCollections.Add(Collection);
+			if (TraversingCollection != nullptr)
+			{
+				TraversingCollection->UINavCollections.Add(Collection);
+			}
+			Collection->Init(UINavWidget->UINavButtons.Num());
 			continue;
 		}
 
@@ -390,7 +385,7 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 
 			InputContainer->Init(UINavWidget, UINavWidget->bAutoAppended ? UINavWidget->NavigationGrids.Num() : -1);
 
-			if (UINavWidget->bAutoAppended)
+			if (UINavWidget->bAutoAppended && InputContainer->NumberOfInputs > 0)
 			{
 				UINavWidget->GridIndexMap.Add(InputContainer, UINavWidget->NavigationGrids.Num());
 				const int NumInputContainerButtons = InputContainer->KeysPerInput * InputContainer->NumberOfInputs;
@@ -407,67 +402,19 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 			continue;
 		}
 
-		UUINavButton* NewNavButton = Cast<UUINavButton>(Widget);
-		if (NewNavButton == nullptr)
+		UListView* ListView = Cast<UListView>(Widget);
+		if (ListView != nullptr)
 		{
-			UUINavComponent* UIComp = Cast<UUINavComponent>(Widget);
-			if (UIComp == nullptr)
+			TArray<UObject*> ListItems = ListView->GetListItems();
+			for (UObject* ListItem : ListItems)
 			{
-				UUINavComponentWrapper* UICompWrapper = Cast<UUINavComponentWrapper>(Widget);
-				if (UICompWrapper != nullptr)
-				{
-					UIComp = UICompWrapper->GetUINavComponent();
-				}
+				SearchForUINavElements(UINavWidget, WidgetToTraverse, Cast<UWidget>(ListItem), TraversingCollection, GridDepth);
 			}
 
-			if (UIComp != nullptr)
-			{
-				NewNavButton = Cast<UUINavButton>(UIComp->NavButton);
-
-				UUINavHorizontalComponent* HorizComp = Cast<UUINavHorizontalComponent>(UIComp);
-				if (HorizComp != nullptr)
-				{
-					HorizComp->ParentWidget = UINavWidget;
-				}
-			}
+			continue;
 		}
 
-		if (NewNavButton == nullptr) continue;
-
-		if (NewNavButton->ButtonIndex == -1) NewNavButton->ButtonIndex = UINavWidget->UINavButtons.Num();
-
-		UINavWidget->SetupUINavButtonDelegates(NewNavButton);
-
-		NewNavButton->bAutoCollapse = NewNavButton->bIsEnabled;
-		UINavWidget->UINavButtons.Add(NewNavButton);
-		UINavWidget->RevertButtonStyle(UINavWidget->UINavButtons.Num() - 1);
-
-		if (UINavWidget->bAutoAppended && TraversingCollection != nullptr)
-		{
-			if (TraversingCollection->FirstButtonIndex == -1) TraversingCollection->FirstButtonIndex = NewNavButton->ButtonIndex;
-			TraversingCollection->SetLastButtonIndex(NewNavButton->ButtonIndex);
-		}
-
-		if (GridDepth != -1)
-		{
-			FGrid& LastGrid = UINavWidget->NavigationGrids.Last();
-			UINavWidget->NumberOfButtonsInGrids++;
-			NewNavButton->GridIndex = UINavWidget->NavigationGrids.Num() - 1;
-			if (LastGrid.FirstButton == nullptr) LastGrid.FirstButton = NewNavButton;
-
-			switch (LastGrid.GridType)
-			{
-			case EGridType::Horizontal:
-				NewNavButton->IndexInGrid = LastGrid.DimensionX++;
-				break;
-			case EGridType::Vertical:
-				NewNavButton->IndexInGrid = LastGrid.DimensionY++;
-				break;
-			case EGridType::Grid2D:
-				NewNavButton->IndexInGrid = LastGrid.NumGrid2DButtons++;
-				break;
-			}
-		}
+		SearchForUINavElements(UINavWidget, WidgetToTraverse, Widget, TraversingCollection, GridDepth);
 	}
 
 	if (WidgetToTraverse->IsA<UUINavWidget>())
@@ -478,10 +425,82 @@ void UUINavWidget::TraverseHierarquy(UUINavWidget* UINavWidget, UUserWidget* Wid
 			});
 	}
 
-	if (UINavWidget->bAutoAppended && TraversingCollection != nullptr)
+	if (TraversingCollection != nullptr && (UINavWidget->bAutoAppended || WidgetHasUINPrefix(TraversingCollection)))
 	{
 		const TArray<FButtonNavigation> EdgeNavigations;
 		TraversingCollection->SetupNavigation(EdgeNavigations);
+	}
+}
+
+bool UUINavWidget::WidgetHasUINPrefix(const UWidget* Widget)
+{
+	return Widget->GetFName().ToString().Left(4).Equals(TEXT("UIN_"));
+}
+
+void UUINavWidget::SearchForUINavElements(UUINavWidget* UINavWidget, UUserWidget* WidgetToTraverse, UWidget* Widget, UUINavCollection* TraversingCollection, const int GridDepth)
+{
+	if (Widget == nullptr) return;
+
+	UUINavButton* NewNavButton = Cast<UUINavButton>(Widget);
+	if (NewNavButton == nullptr)
+	{
+		UUINavComponent* UIComp = Cast<UUINavComponent>(Widget);
+		if (UIComp == nullptr)
+		{
+			UUINavComponentWrapper* UICompWrapper = Cast<UUINavComponentWrapper>(Widget);
+			if (UICompWrapper != nullptr)
+			{
+				UIComp = UICompWrapper->GetUINavComponent();
+			}
+		}
+
+		if (UIComp != nullptr)
+		{
+			NewNavButton = Cast<UUINavButton>(UIComp->NavButton);
+
+			UUINavHorizontalComponent* HorizComp = Cast<UUINavHorizontalComponent>(UIComp);
+			if (HorizComp != nullptr)
+			{
+				HorizComp->ParentWidget = UINavWidget;
+			}
+		}
+	}
+
+	if (NewNavButton == nullptr) return;
+
+	if (NewNavButton->ButtonIndex == -1) NewNavButton->ButtonIndex = UINavWidget->UINavButtons.Num();
+
+	UINavWidget->SetupUINavButtonDelegates(NewNavButton);
+
+	NewNavButton->bAutoCollapse = NewNavButton->GetIsEnabled();
+	UINavWidget->UINavButtons.Add(NewNavButton);
+	UINavWidget->RevertButtonStyle(UINavWidget->UINavButtons.Num() - 1);
+
+	if (UINavWidget->bAutoAppended && TraversingCollection != nullptr)
+	{
+		if (TraversingCollection->FirstButtonIndex == -1) TraversingCollection->FirstButtonIndex = NewNavButton->ButtonIndex;
+		TraversingCollection->SetLastButtonIndex(NewNavButton->ButtonIndex);
+	}
+
+	if (GridDepth != -1)
+	{
+		FGrid& LastGrid = UINavWidget->NavigationGrids.Last();
+		UINavWidget->NumberOfButtonsInGrids++;
+		NewNavButton->GridIndex = UINavWidget->NavigationGrids.Num() - 1;
+		if (LastGrid.FirstButton == nullptr) LastGrid.FirstButton = NewNavButton;
+
+		switch (LastGrid.GridType)
+		{
+		case EGridType::Horizontal:
+			NewNavButton->IndexInGrid = LastGrid.DimensionX++;
+			break;
+		case EGridType::Vertical:
+			NewNavButton->IndexInGrid = LastGrid.DimensionY++;
+			break;
+		case EGridType::Grid2D:
+			NewNavButton->IndexInGrid = LastGrid.NumGrid2DButtons++;
+			break;
+		}
 	}
 }
 
@@ -514,9 +533,7 @@ void UUINavWidget::RebuildNavigation(const int NewButtonIndex)
 	bMovingSelector = false;
 	bIgnoreMouseEvent = false;
 	bReturning = false;
-	bShouldTick = true;
 	ReceiveInputType = EReceiveInputType::None;
-	WaitForTick = 0;
 	HaltedIndex = -1;
 	SelectedButtonIndex = -1;
 	SelectCount = 0;
@@ -552,6 +569,9 @@ void UUINavWidget::SetupSelector()
 
 	SelectorSlot->SetAlignment(FVector2D(0.5f, 0.5f));
 	SelectorSlot->SetPosition(FVector2D(0.f, 0.f));
+	
+	UINavSetupWaitForTick=0;
+	bShouldTickUINavSetup = true;
 }
 
 void UUINavWidget::UINavSetup()
@@ -574,7 +594,7 @@ void UUINavWidget::UINavSetup()
 	{
 		SetEnableUINavButtons(true, true);
 	}
-	
+
 	bCompletedSetup = true;
 
 	if (OuterUINavWidget == nullptr)
@@ -625,22 +645,36 @@ void UUINavWidget::GainNavigation(UUINavWidget* PreviousActiveWidget)
 {
 	if (bHasNavigation) return;
 
+	if (IsValid(UINavPC))
+	{
+		bForcingNavigation = bShouldForceNavigation || UINavPC->CurrentInputType != EInputType::Mouse;
+	}
+
+	const bool bShouldUpdateNavigation = bForcingNavigation || ButtonIndex == HoveredButtonIndex;
+	
 	if (UINavButtons.Num() > 0)
 	{
 		bHasNavigation = true;
 		DispatchNavigation(ButtonIndex);
-		OnNavigate(-1, ButtonIndex);
-		CollectionNavigateTo(ButtonIndex);
 
+		if (bShouldUpdateNavigation)
+		{
+			OnNavigate(-1, ButtonIndex);
+			CollectionNavigateTo(ButtonIndex);
+		}
+		
 		if (IsSelectorValid())
 		{
 			TheSelector->SetVisibility(ESlateVisibility::HitTestInvisible);
 		}
 
-		bIgnoreMouseEvent = true;
-		if (CurrentButton != nullptr)
+		if (bShouldUpdateNavigation)
 		{
-			CurrentButton->OnHovered.Broadcast();
+			bIgnoreMouseEvent = true;
+			if (CurrentButton != nullptr)
+			{
+				CurrentButton->OnHovered.Broadcast();
+			}
 		}
 		
 		for (FDynamicEdgeNavigation& DynamicEdgeNavigation : DynamicEdgeNavigations)
@@ -720,30 +754,47 @@ void UUINavWidget::NativeTick(const FGeometry & MyGeometry, float DeltaTime)
 {
 	Super::NativeTick(MyGeometry, DeltaTime);
 
-	if (!IsSelectorValid() || !bSetupStarted) return;
-
-	if (bMovingSelector)
+	if (IsSelectorValid())
 	{
-		HandleSelectorMovement(DeltaTime);
-	}
-	else
-	{
-		if (!bShouldTick) return;
-
-		if (WaitForTick == 1)
+		if (bShouldTickUINavSetup)
 		{
-			UINavSetup();
-			bShouldTick = false;
-			return;
+			if (UINavSetupWaitForTick >= 1)
+			{
+				UINavSetup();
+				bShouldTickUINavSetup = false;
+			}
+			else
+			{
+				UINavSetupWaitForTick++;
+			}
 		}
+		else
+		{
+			if (bShouldTickUpdateSelector)
+			{
+				if (UpdateSelectorWaitForTick >= 1)
+				{
+					if (MoveCurve != nullptr) BeginSelectorMovement(UpdateSelectorPrevButtonIndex, UpdateSelectorNextButtonIndex);
+					else UpdateSelectorLocation(UpdateSelectorNextButtonIndex);
+					bShouldTickUpdateSelector = false;
+				}
+				else
+				{
+					UpdateSelectorWaitForTick++;
+				}
+			}
 
-		WaitForTick++;
+			if (bMovingSelector)
+			{
+				HandleSelectorMovement(DeltaTime);
+			}
+		}
 	}
 }
 
 void UUINavWidget::RemoveFromParent()
 {
-	if (OuterUINavWidget == nullptr && !bReturningToParent && !bDestroying && !GetFName().IsNone() && !IsPendingKill() &&
+	if (OuterUINavWidget == nullptr && !bReturningToParent && !bDestroying && !GetFName().IsNone() && IsValid(this) &&
 	    (ParentWidget != nullptr || (bAllowRemoveIfRoot && UINavPC != nullptr)))
 	{
 		ReturnToParent();
@@ -752,12 +803,6 @@ void UUINavWidget::RemoveFromParent()
 	bReturningToParent = false;
 
 	Super::RemoveFromParent();
-}
-
-void UUINavWidget::OnLevelRemovedFromWorld(ULevel* InLevel, UWorld* InWorld)
-{
-	bDestroying = true;
-	Super::OnLevelRemovedFromWorld(InLevel, InWorld);
 }
 
 FReply UUINavWidget::NativeOnKeyDown(const FGeometry & InGeometry, const FKeyEvent & InKeyEvent)
@@ -790,15 +835,9 @@ FReply UUINavWidget::NativeOnKeyUp(const FGeometry & InGeometry, const FKeyEvent
 {
 	if (UINavPC->GetInputMode() != EInputMode::UI)
 	{
-		if (ReceiveInputType != EReceiveInputType::None)
+		if (IsRebindingInput())
 		{
-			FKey Key = InKeyEvent.GetKey();
-
-			if (ReceiveInputType == EReceiveInputType::Axis)
-			{
-				Key = UINavInputContainer->GetAxisFromKey(Key);
-			}
-
+			const FKey Key = InKeyEvent.GetKey();
 			ProcessKeybind(Key);
 			return FReply::Handled();
 		}
@@ -818,8 +857,7 @@ FReply UUINavWidget::NativeOnMouseWheel(const FGeometry & InGeometry, const FPoi
 {
 	if (IsRebindingInput())
 	{
-		FKey PressedMouseKey = InMouseEvent.GetWheelDelta() > 0.f ? EKeys::MouseScrollUp : EKeys::MouseScrollDown;
-		if (ReceiveInputType == EReceiveInputType::Axis) PressedMouseKey = EKeys::MouseWheelAxis;
+		const FKey PressedMouseKey = InMouseEvent.GetWheelDelta() > 0.f ? EKeys::MouseScrollUp : EKeys::MouseScrollDown;
 		ProcessKeybind(PressedMouseKey);
 		return FReply::Handled();
 	}
@@ -890,9 +928,9 @@ void UUINavWidget::HandleSelectorMovement(const float DeltaTime)
 	TheSelector->SetRenderTranslation(SelectorOrigin + Distance*MoveCurve->GetFloatValue(MovementCounter));
 }
 
-void UUINavWidget::AddUINavButton(UUINavButton * NewButton, int const TargetGridIndex, int IndexInGrid)
+void UUINavWidget::AddUINavButton(UUINavButton* NewButton, const int TargetGridIndex, int IndexInGrid)
 {
-	if (NewButton == nullptr || !IsGridIndexValid(TargetGridIndex)) return;
+	if (!IsValid(NewButton) || !NavigationGrids.IsValidIndex(TargetGridIndex) || !bSetupStarted) return;
 
 	if (UINavAnimations.Num() > 0)
 	{
@@ -903,6 +941,8 @@ void UUINavWidget::AddUINavButton(UUINavButton * NewButton, int const TargetGrid
 	FGrid& TargetGrid = NavigationGrids[TargetGridIndex];
 
 	if (IndexInGrid >= TargetGrid.GetDimension() || IndexInGrid <= -1) IndexInGrid = TargetGrid.GetDimension();
+
+	if (TargetGrid.FirstButton == nullptr) NewButton->ButtonIndex = -1;
 
 	IncrementGrid(NewButton, TargetGrid, IndexInGrid);
 
@@ -925,7 +965,8 @@ void UUINavWidget::AddUINavButton(UUINavButton * NewButton, int const TargetGrid
 
 void UUINavWidget::AddUINavButtons(TArray<UUINavButton*> NewButtons, const int TargetGridIndex, int IndexInGrid)
 {
-	if (!IsGridIndexValid(TargetGridIndex)) return;
+	if (!NavigationGrids.IsValidIndex(TargetGridIndex) || !bSetupStarted) return;
+
 	if (UINavAnimations.Num() > 0)
 	{
 		DISPLAYERROR("Runtime manipulation not supported with navigation using animations.");
@@ -948,7 +989,7 @@ void UUINavWidget::AddUINavComponent(UUINavComponent * NewComponent, const int T
 
 void UUINavWidget::AddUINavComponents(TArray<UUINavComponent*> NewComponents, const int TargetGridIndex, int IndexInGrid)
 {
-	if (!IsGridIndexValid(TargetGridIndex)) return;
+	if (!NavigationGrids.IsValidIndex(TargetGridIndex) || !bSetupStarted) return;
 	if (UINavAnimations.Num() > 0)
 	{
 		DISPLAYERROR("Runtime manipulation not supported with navigation using animations.");
@@ -957,7 +998,7 @@ void UUINavWidget::AddUINavComponents(TArray<UUINavComponent*> NewComponents, co
 	if (IndexInGrid >= NavigationGrids[TargetGridIndex].GetDimension()) IndexInGrid = -1;
 	const bool bIncrementIndexInGrid = IndexInGrid > -1;
 
-	for (UUINavComponent* NewComponent : NewComponents)
+	for (const UUINavComponent* NewComponent : NewComponents)
 	{
 		AddUINavButton(NewComponent->NavButton, TargetGridIndex, IndexInGrid);
 		if (bIncrementIndexInGrid) IndexInGrid++;
@@ -966,14 +1007,14 @@ void UUINavWidget::AddUINavComponents(TArray<UUINavComponent*> NewComponents, co
 
 void UUINavWidget::DeleteUINavElement(const int Index, const bool bAutoNavigate)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index)) return;
 
 	if (Index == ButtonIndex)
 	{
 		bool bValid = false;
 
 		UUINavButton* Temp = CurrentButton;
-		while (!bValid)
+		while (!bValid && IsValid(Temp))
 		{
 			int NewIndex = Temp->ButtonIndex + 1;
 			if (NewIndex >= UINavButtons.Num()) NewIndex = 0;
@@ -998,11 +1039,8 @@ void UUINavWidget::DeleteUINavElement(const int Index, const bool bAutoNavigate)
 			NavigateTo(Temp->ButtonIndex);
 		}
 	}
-	else
-	{
-		ButtonIndex = CurrentButton->ButtonIndex;
-	}
 
+	NumberOfButtonsInGrids--;
 	UUINavButton* Button = UINavButtons[Index];
 	DecrementGrid(NavigationGrids[Button->GridIndex], Button->IndexInGrid);
 
@@ -1013,12 +1051,18 @@ void UUINavWidget::DeleteUINavElement(const int Index, const bool bAutoNavigate)
 
 void UUINavWidget::DeleteUINavElementFromGrid(const int GridIndex, int IndexInGrid, const bool bAutoNavigate)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		DISPLAYERROR("Invalid GridIndex");
 		return;
 	}
 	const FGrid& TargetGrid = NavigationGrids[GridIndex];
+
+	if (TargetGrid.GetDimension() == 0)
+	{
+		return;
+	}
+
 	IndexInGrid = IndexInGrid >= 0 && IndexInGrid < TargetGrid.GetDimension() ? IndexInGrid : TargetGrid.GetDimension() - 1;
 
 	DeleteUINavElement(TargetGrid.FirstButton->ButtonIndex + IndexInGrid, bAutoNavigate);
@@ -1105,6 +1149,11 @@ void UUINavWidget::DecrementUINavButtonIndices(const int StartingIndex, const in
 		}
 	}
 	UINavButtons.RemoveAt(UINavButtons.Num()-1, 1, true);
+
+	if (StartingIndex <= ButtonIndex && ButtonIndex > 0)
+	{
+		--ButtonIndex;
+	}
 }
 
 void UUINavWidget::MoveUINavElementToGrid(const int Index, const int TargetGridIndex, int IndexInGrid)
@@ -1148,7 +1197,7 @@ void UUINavWidget::MoveUINavElementToGrid(const int Index, const int TargetGridI
 
 void UUINavWidget::MoveUINavElementToGrid2(const int FromGridIndex, int FromIndexInGrid, const int TargetGridIndex, const int TargetIndexInGrid)
 {
-	if (!IsGridIndexValid(FromGridIndex)) return;
+	if (!NavigationGrids.IsValidIndex(FromGridIndex)) return;
 
 	const FGrid& TargetGrid = NavigationGrids[FromGridIndex];
 	if (TargetGrid.FirstButton == nullptr) return;
@@ -1263,26 +1312,25 @@ void UUINavWidget::ReplaceButtonInNavigationGrid(UUINavButton * ButtonToReplace,
 
 void UUINavWidget::UpdateCurrentButton(UUINavButton * NewCurrentButton)
 {
-	ButtonIndex = NewCurrentButton->ButtonIndex;
 	if (IsSelectorValid())
 	{
-		if (MoveCurve != nullptr) BeginSelectorMovement(NewCurrentButton->ButtonIndex);
-		else UpdateSelectorLocation(NewCurrentButton->ButtonIndex);
+		UpdateSelectorWaitForTick = 0;
+		UpdateSelectorPrevButtonIndex = ButtonIndex;
+		UpdateSelectorNextButtonIndex = NewCurrentButton->ButtonIndex;
+		bShouldTickUpdateSelector = true;
 	}
 
+	ButtonIndex = NewCurrentButton->ButtonIndex;
+	
 	for (UScrollBox* ScrollBox : ScrollBoxes)
 	{
-		if (NewCurrentButton->IsChildOf(ScrollBox))
-		{
 			ScrollBox->ScrollWidgetIntoView(NewCurrentButton, bAnimateScrollBoxes);
-			break;
-		}
 	}
 }
 
 void UUINavWidget::ClearGrid(const int GridIndex, const bool bAutoNavigate)
 {
-	if (!IsGridIndexValid(GridIndex)) return;
+	if (!NavigationGrids.IsValidIndex(GridIndex)) return;
 
 	FGrid& Grid = NavigationGrids[GridIndex];
 	if (Grid.FirstButton == nullptr) return;
@@ -1290,6 +1338,8 @@ void UUINavWidget::ClearGrid(const int GridIndex, const bool bAutoNavigate)
 	const int FirstIndex = Grid.FirstButton->ButtonIndex;
 	const int LastIndex = FirstIndex + Grid.GetDimension() - 1;
 	const int Difference = LastIndex - FirstIndex + 1;
+
+	NumberOfButtonsInGrids -= Grid.GetDimension();
 
 	const bool bShouldNavigate = bAutoNavigate && ButtonIndex >= FirstIndex && ButtonIndex <= LastIndex;
 	if (bShouldNavigate)
@@ -1348,7 +1398,7 @@ void UUINavWidget::ClearGrid(const int GridIndex, const bool bAutoNavigate)
 	Grid.DimensionY = 0;
 	Grid.NumGrid2DButtons = 0;
 
-	if (bShouldNavigate)
+	if (bShouldNavigate && CurrentButton != nullptr)
 	{
 		ButtonIndex = CurrentButton->ButtonIndex;
 	}
@@ -1450,7 +1500,8 @@ void UUINavWidget::AppendNavigationGrid2D(const int DimensionX, int DimensionY, 
 		DISPLAYERROR("Invalid ButtonsInGrid value!");
 		return;
 	}
-	else if (ButtonsInGrid >= 0)
+	
+	if (ButtonsInGrid >= 0)
 	{
 		const int DesiredY = (ButtonsInGrid / DimensionX) + 1;
 		if (DimensionY > DesiredY)
@@ -1485,8 +1536,8 @@ void UUINavWidget::AppendNavigationGrid2D(const int DimensionX, int DimensionY, 
 
 void UUINavWidget::AddEdgeNavigation(const int GridIndex1, const int TargetIndexInGrid1, const int GridIndex2, const int TargetIndexInGrid2, const ENavigationDirection Direction, const bool bTwoWayConnection)
 {
-	if (!IsGridIndexValid(GridIndex1)) return;
-	if (!IsGridIndexValid(GridIndex2)) return;
+	if (!NavigationGrids.IsValidIndex(GridIndex1)) return;
+	if (!NavigationGrids.IsValidIndex(GridIndex2)) return;
 	if (GridIndex1 == GridIndex2) return;
 
 	FGrid& Grid1 = NavigationGrids[GridIndex1];
@@ -1522,7 +1573,7 @@ void UUINavWidget::AddEdgeNavigation(const int GridIndex1, const int TargetIndex
 
 void UUINavWidget::AddSingleGridDynamicEdgeNavigation(const int GridIndex, const int TargetGridIndex, TArray<int> TargetButtonIndices, const ENavigationEvent Event, const ENavigationDirection Direction, const bool bTwoWayConnection)
 {
-	if (!IsGridIndexValid(GridIndex) || !IsGridIndexValid(TargetGridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex) || !NavigationGrids.IsValidIndex(TargetGridIndex))
 	{
 		DISPLAYERROR("Invalid GridIndex or TargetGridIndex in AddSingleGridDynamicEdgeNavigation function!");
 		return;
@@ -1534,8 +1585,8 @@ void UUINavWidget::AddSingleGridDynamicEdgeNavigation(const int GridIndex, const
 		return;
 	}
 
-	FGrid& CurrentGrid = NavigationGrids[GridIndex];
-	FGrid& TargetGrid = NavigationGrids[TargetGridIndex];
+	const FGrid& CurrentGrid = NavigationGrids[GridIndex];
+	const FGrid& TargetGrid = NavigationGrids[TargetGridIndex];
 
 	const bool bHorizontal = Direction == ENavigationDirection::Left || Direction == ENavigationDirection::Right;
 
@@ -1615,7 +1666,7 @@ void UUINavWidget::AddSingleGridDynamicEdgeNavigation(const int GridIndex, const
 
 void UUINavWidget::AddMultiGridDynamicEdgeNavigation(const int GridIndex, TArray<FGridButton> TargetButtons, const ENavigationEvent Event, const ENavigationDirection Direction, const bool bTwoWayConnection)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		DISPLAYERROR("Invalid GridIndex in AddMultiGridDynamicEdgeNavigation function!");
 		return;
@@ -1633,7 +1684,7 @@ void UUINavWidget::AddMultiGridDynamicEdgeNavigation(const int GridIndex, TArray
 		return;
 	}
 
-	FGrid& CurrentGrid = NavigationGrids[GridIndex];
+	const FGrid& CurrentGrid = NavigationGrids[GridIndex];
 	const bool bIsHorizontal = Direction == ENavigationDirection::Left || Direction == ENavigationDirection::Right;
 	if (bIsHorizontal && CurrentGrid.GridType == EGridType::Horizontal)
 	{
@@ -1650,7 +1701,7 @@ void UUINavWidget::AddMultiGridDynamicEdgeNavigation(const int GridIndex, TArray
 	for (int i = 0; i < TargetButtons.Num(); ++i)
 	{
 		const FGridButton& GridButton = TargetButtons[i];
-		if (!IsGridIndexValid(GridButton.GridIndex))
+		if (!NavigationGrids.IsValidIndex(GridButton.GridIndex))
 		{
 			DISPLAYERROR("Invalid TargetButton GridIndex in AddMultiGridDynamicEdgeNavigation function!");
 			return;
@@ -1681,7 +1732,7 @@ void UUINavWidget::UpdateDynamicEdgeNavigations(const int UpdatedGridIndex)
 	{
 		if (DynamicEdgeNavigation.TargetGridIndex == UpdatedGridIndex)
 		{
-			FGrid& CurrentGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
+			const FGrid& CurrentGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
 			FGrid& TargetGrid = NavigationGrids[DynamicEdgeNavigation.TargetGridIndex];
 			const bool bHorizontal = DynamicEdgeNavigation.Direction == ENavigationDirection::Left || DynamicEdgeNavigation.Direction == ENavigationDirection::Right;
 
@@ -1762,9 +1813,56 @@ void UUINavWidget::AppendCollection(const TArray<FButtonNavigation>& EdgeNavigat
 	CollectionIndex++;
 }
 
+void UUINavWidget::DeleteGrid(const int GridIndex)
+{
+	if (!NavigationGrids.IsValidIndex(GridIndex)) return;
+
+	const int NumRemainingGrids = NavigationGrids.Num() - (GridIndex + 1);
+
+	if (NumRemainingGrids > 0)
+	{
+		int NextGridIndex = GridIndex + 1;
+		while (NavigationGrids.IsValidIndex(NextGridIndex))
+		{
+			if (NavigationGrids[NextGridIndex].FirstButton != nullptr)
+			{
+				int NextButtonIndex = NavigationGrids[NextGridIndex].FirstButton->ButtonIndex;
+				while (UINavButtons.IsValidIndex(NextButtonIndex))
+				{
+					UINavButtons[NextButtonIndex++]->GridIndex--;
+				}
+
+				break;
+			}
+			
+			if (NavigationGrids[NextGridIndex].GridIndex > GridIndex)
+			{
+				NavigationGrids[NextGridIndex].GridIndex--;
+			}
+
+			++NextGridIndex;
+		}
+
+		for (UUINavCollection* Collection : UINavCollections)
+		{
+			if (Collection->FirstGridIndex == GridIndex)
+			{
+				Collection->FirstGridIndex = -1;
+			}
+
+			if (Collection->FirstGridIndex > GridIndex)
+			{
+				Collection->FirstGridIndex--;
+			}
+		}
+	}
+
+	NavigationGrids.RemoveAt(GridIndex);
+}
+
 void UUINavWidget::SetEdgeNavigation(const int GridIndex, const FButtonNavigation NewEdgeNavigation)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		return;
 	}
@@ -1781,7 +1879,7 @@ void UUINavWidget::SetBulkEdgeNavigation(const TArray<int>& GridIndices, const F
 
 void UUINavWidget::SetEdgeNavigationByButton(const int GridIndex, const FButtonNavigation NewEdgeNavigation)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		return;
 	}
@@ -1798,7 +1896,7 @@ void UUINavWidget::SetBulkEdgeNavigationByButton(const TArray<int>& GridIndices,
 
 void UUINavWidget::SetWrap(const int GridIndex, const bool bWrap)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		return;
 	}
@@ -1826,7 +1924,7 @@ void UUINavWidget::UpdateSelectorLocation(const int Index)
 FVector2D UUINavWidget::GetButtonLocation(const int Index)
 {
 	const FGeometry Geom = UINavButtons[Index]->GetCachedGeometry();
-	FVector2D LocalSize = Geom.GetLocalSize();
+	const FVector2D LocalSize = Geom.GetLocalSize();
 	FVector2D LocalPosition;
 	switch (SelectorPositioning)
 	{
@@ -1898,7 +1996,7 @@ void UUINavWidget::ExecuteAnimations(const int From, const int To)
 		}
 	}
 
-	if (To > -1 && To < UINavAnimations.Num())
+	if (UINavAnimations.IsValidIndex(To))
 	{
 		if (UINavAnimations.Num() <= To || UINavAnimations[To] == nullptr) return;
 
@@ -1921,7 +2019,7 @@ void UUINavWidget::UpdateTextColor(const int Index)
 
 void UUINavWidget::SwitchTextColorTo(const int Index, FLinearColor Color)
 {
-    if (!IsButtonIndexValid(Index)) return;
+    if (!UINavButtons.IsValidIndex(Index)) return;
     
 	UTextBlock* NewText = nullptr;
 	UUINavComponent* UINavComponent = UINavButtons[Index]->NavComp;
@@ -1951,7 +2049,7 @@ void UUINavWidget::UpdateHoveredButtonStates(const int Index)
 
 void UUINavWidget::SwitchButtonStyle(const EButtonStyle NewStyle, const int Index, const bool bRevertStyle)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index)) return;
 	
 	UUINavButton* TheButton = UINavButtons[Index];
 	const bool bWasForcePressed = TheButton->ForcedStyle == EButtonStyle::Pressed;
@@ -1977,7 +2075,7 @@ void UUINavWidget::SwitchButtonStyle(const EButtonStyle NewStyle, const int Inde
 	
 	if (NewStyle == EButtonStyle::Hovered && Index != ButtonIndex)
 	{
-		USoundBase* HoverSound = Cast<USoundBase>(TheButton->WidgetStyle.HoveredSlateSound.GetResourceObject());
+		USoundBase* HoverSound = Cast<USoundBase>(TheButton->GetStyle().HoveredSlateSound.GetResourceObject());
 		if (HoverSound != nullptr)
 		{
 			PlaySound(HoverSound);
@@ -1987,7 +2085,7 @@ void UUINavWidget::SwitchButtonStyle(const EButtonStyle NewStyle, const int Inde
 
 void UUINavWidget::RevertButtonStyle(const int Index)
 {
-    if (!IsButtonIndexValid(Index)) return;
+    if (!UINavButtons.IsValidIndex(Index)) return;
 	
 	UUINavButton* TheButton = UINavButtons[Index];
 	if (TheButton->ForcedStyle == EButtonStyle::None) return;
@@ -1999,7 +2097,7 @@ void UUINavWidget::RevertButtonStyle(const int Index)
 
 void UUINavWidget::SwapStyle(UUINavButton* TargetButton, EButtonStyle Style1, EButtonStyle Style2)
 {
-	FButtonStyle Style = TargetButton->WidgetStyle;
+	FButtonStyle Style = TargetButton->GetStyle();
 	FSlateBrush TempState;
 
 	switch (Style1)
@@ -2053,12 +2151,12 @@ void UUINavWidget::SwapStyle(UUINavButton* TargetButton, EButtonStyle Style1, EB
 
 void UUINavWidget::SwapPadding(UUINavButton* TargetButton)
 {
-	const FButtonStyle Style = TargetButton->WidgetStyle;
+	const FButtonStyle Style = TargetButton->GetStyle();
 	UOverlaySlot* OverlaySlot = Cast<UOverlaySlot>(TargetButton->Slot);
 	const FMargin PressedPadding = Style.PressedPadding - Style.NormalPadding;
 	if (OverlaySlot != nullptr)
 	{
-		OverlaySlot->SetPadding(OverlaySlot->Padding == PressedPadding ? FMargin(0.0f) : PressedPadding);
+		OverlaySlot->SetPadding(OverlaySlot->GetPadding() == PressedPadding ? FMargin(0.0f) : PressedPadding);
 	}
 }
 
@@ -2106,23 +2204,23 @@ void UUINavWidget::OnStopSelect_Implementation(const int Index)
 
 }
 
-void UUINavWidget::NavigateTo(const int Index, const bool bHoverEvent)
+void UUINavWidget::NavigateTo(const int Index, const bool bHoverEvent, const bool bBypassChecks)
 {
-	if (Index >= UINavButtons.Num() || Index == ButtonIndex) return;
+	if (!bBypassChecks && (Index >= UINavButtons.Num() || (Index == ButtonIndex && bForcingNavigation))) return;
 
 	DispatchNavigation(Index);
-	OnNavigate(ButtonIndex, Index);
-	CollectionNavigateTo(Index);
-
-	if (!bHoverEvent)
-	{
-		bIgnoreMouseEvent = true;
-		CurrentButton->OnUnhovered.Broadcast();
-	}
-
+	const int OldButtonIndex = ButtonIndex;
+	const UUINavButton* OldButton = CurrentButton;
 	ButtonIndex = Index;
 	CurrentButton = UINavButtons[ButtonIndex];
+	OnNavigate(OldButtonIndex, ButtonIndex);
+	CollectionNavigateTo(ButtonIndex);
 
+	if (!bHoverEvent && IsValid(OldButton))
+	{
+		bIgnoreMouseEvent = true;
+		OldButton->OnUnhovered.Broadcast();
+	}
 	if (!bHoverEvent)
 	{
 		bIgnoreMouseEvent = true;
@@ -2206,7 +2304,7 @@ void UUINavWidget::OnPromptDecided(const TSubclassOf<UUINavPromptWidget> PromptC
 	{
 		if (CustomFunction->ParmsSize == sizeof(int))
 		{
-			uint8* Buffer = (uint8*)FMemory_Alloca(sizeof(int));
+			uint8* Buffer = static_cast<uint8*>(FMemory_Alloca(sizeof(int)));
 			FMemory::Memcpy(Buffer, &Index, sizeof(int));
 			ProcessEvent(CustomFunction, Buffer);
 		}
@@ -2225,7 +2323,7 @@ void UUINavWidget::ProcessDynamicEdgeNavigation(FDynamicEdgeNavigation& DynamicE
 	const ENavigationDirection Dir = DynamicEdgeNavigation.Direction;
 	const bool bHorizontal = Dir == ENavigationDirection::Left || Dir == ENavigationDirection::Right;
 
-	FGrid& CurrentGrid = NavigationGrids[CurrentGridIndex];
+	const FGrid& CurrentGrid = NavigationGrids[CurrentGridIndex];
 	if (CurrentGrid.GridType == EGridType::Grid2D)
 	{
 		int XCoord, YCoord;
@@ -2260,7 +2358,7 @@ void UUINavWidget::ProcessDynamicEdgeNavigation(FDynamicEdgeNavigation& DynamicE
 			{
 				if (CurrentIndexInGrid == DynamicEdgeNavigation.TargetButtonIndices[i])
 				{
-					FGrid& TargetGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
+					const FGrid& TargetGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
 					if (TargetGrid.GridType == EGridType::Grid2D)
 					{
 						if (Dir == ENavigationDirection::Left) IndexInGrid = i * TargetGrid.DimensionX;
@@ -2324,7 +2422,7 @@ void UUINavWidget::ProcessDynamicEdgeNavigation(FDynamicEdgeNavigation& DynamicE
 			for (int i = 0; i < DynamicEdgeNavigation.TargetButtons.Num(); ++i)
 			{
 				const FGridButton& GridButton = DynamicEdgeNavigation.TargetButtons[i];
-				if (!IsGridIndexValid(GridButton.GridIndex) ||
+				if (!NavigationGrids.IsValidIndex(GridButton.GridIndex) ||
 					GridButton.IndexInGrid >= NavigationGrids[GridButton.GridIndex].GetDimension())
 				{
 					return;
@@ -2348,7 +2446,7 @@ void UUINavWidget::ProcessDynamicEdgeNavigation(FDynamicEdgeNavigation& DynamicE
 				if (GridButton.GridIndex == CurrentGridIndex &&
 					GridButton.IndexInGrid == CurrentIndexInGrid)
 				{
-					FGrid& TargetGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
+					const FGrid& TargetGrid = NavigationGrids[DynamicEdgeNavigation.GridIndex];
 					if (TargetGrid.GridType == EGridType::Grid2D)
 					{
 						if (Dir == ENavigationDirection::Left) IndexInGrid = i * TargetGrid.DimensionX;
@@ -2395,41 +2493,49 @@ void UUINavWidget::UpdateEdgeNavigation(const int GridIndex, UUINavButton* Targe
 	}
 }
 
-void UUINavWidget::DispatchNavigation(const int Index)
+void UUINavWidget::DispatchNavigation(const int Index, const bool bBypassForcedNavigation)
 {
-	//Update all the possible scroll boxes in the widget
-	if (Index > -1)
+	if (bForcingNavigation || Index == HoveredButtonIndex || bBypassForcedNavigation)
 	{
-		for (UScrollBox* ScrollBox : ScrollBoxes)
+		//Update all the possible scroll boxes in the widget
+		if (UINavButtons.IsValidIndex(Index))
 		{
-			ScrollBox->ScrollWidgetIntoView(UINavButtons[Index], bAnimateScrollBoxes);
+			for (UScrollBox* ScrollBox : ScrollBoxes)
+			{
+				ScrollBox->ScrollWidgetIntoView(UINavButtons[Index], bAnimateScrollBoxes);
+			}
 		}
+
+		if (bUseButtonStates) UpdateHoveredButtonStates(Index);
 	}
 
-	if (bUseButtonStates) UpdateHoveredButtonStates(Index);
-
-	if (Index > -1 && IsSelectorValid())
+	if (UINavButtons.IsValidIndex(Index) && IsSelectorValid())
 	{
-		if (MoveCurve != nullptr) BeginSelectorMovement(Index);
-		else UpdateSelectorLocation(Index);
+		UpdateSelectorWaitForTick = 0;
+		UpdateSelectorPrevButtonIndex = ButtonIndex;
+		UpdateSelectorNextButtonIndex = Index;
+		bShouldTickUpdateSelector = true;
 	}
 
-	if (bUseTextColor) UpdateTextColor(Index);
+	if (bForcingNavigation || Index == HoveredButtonIndex || bBypassForcedNavigation)
+	{
+		if (bUseTextColor) UpdateTextColor(Index);
 
-	UUINavComponent* FromComponent = GetUINavComponentAtIndex(ButtonIndex);
-	UUINavComponent* ToComponent = GetUINavComponentAtIndex(Index);
-	if (FromComponent != nullptr) FromComponent->OnNavigatedFrom();
-	if (ToComponent != nullptr) ToComponent->OnNavigatedTo();
-
-	if (UINavAnimations.Num() > 0) ExecuteAnimations(ButtonIndex, Index);
+		UUINavComponent* FromComponent = GetUINavComponentAtIndex(ButtonIndex);
+		UUINavComponent* ToComponent = GetUINavComponentAtIndex(Index);
+		
+		if (FromComponent != nullptr) FromComponent->OnNavigatedFrom();
+		if (ToComponent != nullptr) ToComponent->OnNavigatedTo();
+		if (UINavAnimations.Num() > 0) ExecuteAnimations(ButtonIndex, Index);
+	}
 }
 
-void UUINavWidget::BeginSelectorMovement(const int Index)
+void UUINavWidget::BeginSelectorMovement(const int PrevButtonIndex, const int NextButtonIndex)
 {
 	if (MoveCurve == nullptr) return;
 
-	SelectorOrigin = bMovingSelector ? TheSelector->RenderTransform.Translation : GetButtonLocation(ButtonIndex);
-	SelectorDestination = GetButtonLocation(Index);
+	SelectorOrigin = bMovingSelector ? TheSelector->GetRenderTransform().Translation : GetButtonLocation(PrevButtonIndex);
+	SelectorDestination = GetButtonLocation(NextButtonIndex);
 	Distance = SelectorDestination - SelectorOrigin;
 
 	float MinTime, MaxTime;
@@ -2482,29 +2588,10 @@ void UUINavWidget::CollectionOnStopSelect(const int Index)
 void UUINavWidget::OnPreSelect(const int Index, const bool bMouseClick)
 {
 	if (CurrentButton == nullptr ||
-		SelectedButtonIndex == -1) return;
+		SelectedButtonIndex == -1 ||
+		!UINavButtons.IsValidIndex(Index)) return;
 
 	const bool bIsSelectedButton = SelectedButtonIndex == Index && (!bMouseClick || UINavButtons[Index]->IsHovered());
-
-	if (SelectCount == 1)
-	{
-		if (!bMouseClick)
-		{
-			bIgnoreMouseEvent = true;
-			CurrentButton->OnReleased.Broadcast();
-			if (bIsSelectedButton) CurrentButton->OnClicked.Broadcast();
-		}
-
-		UUINavComponent* CurrentUINavComp = GetUINavComponentAtIndex(Index);
-		if (CurrentUINavComp != nullptr)
-		{
-			if (bIsSelectedButton)
-			{
-				CurrentUINavComp->OnSelected();
-			}
-			CurrentUINavComp->OnStopSelected();
-		}
-	}
 
 	if (UINavInputContainer != nullptr && Index >= UINavInputContainer->FirstButtonIndex && Index <= UINavInputContainer->LastButtonIndex)
 	{
@@ -2521,7 +2608,7 @@ void UUINavWidget::OnPreSelect(const int Index, const bool bMouseClick)
 		if (SelectCount > 0) SelectCount--;
 		if (SelectCount == 0) SelectedButtonIndex = -1;
 	}
-	else
+	else if (UINavButtons.IsValidIndex(Index))
 	{
 		SwitchButtonStyle(UINavButtons[Index]->IsPressed() || SelectCount > 1 ? EButtonStyle::Pressed : (Index == ButtonIndex ? EButtonStyle::Hovered : EButtonStyle::Normal), ButtonIndex);
 
@@ -2532,9 +2619,6 @@ void UUINavWidget::OnPreSelect(const int Index, const bool bMouseClick)
 
 			if (bIsSelectedButton)
 			{
-				OnSelect(Index);
-				CollectionOnSelect(Index);
-
 				for (FDynamicEdgeNavigation& DynamicEdgeNavigation : DynamicEdgeNavigations)
 				{
 					if (DynamicEdgeNavigation.Event == ENavigationEvent::OnSelect)
@@ -2542,9 +2626,49 @@ void UUINavWidget::OnPreSelect(const int Index, const bool bMouseClick)
 						ProcessDynamicEdgeNavigation(DynamicEdgeNavigation);
 					}
 				}
+				OnSelect(Index);
+				CollectionOnSelect(Index);
 			}
 			OnStopSelect(Index);
 			CollectionOnStopSelect(Index);
+
+			if (!bMouseClick && CurrentButton != nullptr)
+			{
+				bIgnoreMouseEvent = true;
+				CurrentButton->OnReleased.Broadcast();
+				if (bIsSelectedButton) CurrentButton->OnClicked.Broadcast();
+			}
+
+			UUINavComponent* CurrentUINavComp = GetUINavComponentAtIndex(Index);
+			if (CurrentUINavComp != nullptr)
+			{
+				if (bIsSelectedButton)
+				{
+					CurrentUINavComp->OnSelected();
+				}
+				CurrentUINavComp->OnStopSelected();
+			}
+		}
+	}
+}
+
+void UUINavWidget::AttemptUnforceNavigation(const EInputType NewInputType)
+{
+	if (!bShouldForceNavigation && NewInputType == EInputType::Mouse)
+	{
+		bForcingNavigation = false;
+		if (HoveredButtonIndex != -1)
+		{
+			if (ButtonIndex != HoveredButtonIndex)
+			{
+				NavigateTo(HoveredButtonIndex);
+			}
+		}
+		else
+		{
+			DispatchNavigation(-1, true);
+			OnNavigate(ButtonIndex, -1);
+			CollectionNavigateTo(-1);
 		}
 	}
 }
@@ -2647,7 +2771,7 @@ UUINavWidget * UUINavWidget::GoToBuiltWidget(UUINavWidget* NewWidget, const bool
 	}
 	else
 	{
-		if (!bUsingSplitScreen || NewWidget->bUseFullscreenWhenSplitscreen) NewWidget->AddToViewport(ZOrder);
+		if (!bForceUsePlayerScreen && (!bUsingSplitScreen || NewWidget->bUseFullscreenWhenSplitscreen)) NewWidget->AddToViewport(ZOrder);
 		else NewWidget->AddToPlayerScreen(ZOrder);
 
 		APlayerController* PC = Cast<APlayerController>(UINavPC->GetOwner());
@@ -2727,10 +2851,10 @@ void UUINavWidget::ReturnToParent(const bool bRemoveAllParents, const int ZOrder
 				//If parent was removed, add it to viewport
 				if (bParentRemoved)
 				{
-					if (!ParentWidget->IsPendingKill())
+					if (IsValid(ParentWidget))
 					{
 						ParentWidget->ReturnedFromWidget = this;
-						if (!bUsingSplitScreen || ParentWidget->bUseFullscreenWhenSplitscreen) ParentWidget->AddToViewport(ZOrder);
+						if (!bForceUsePlayerScreen && (!bUsingSplitScreen || ParentWidget->bUseFullscreenWhenSplitscreen)) ParentWidget->AddToViewport(ZOrder);
 						else ParentWidget->AddToPlayerScreen(ZOrder);
 					}
 				}
@@ -2806,18 +2930,7 @@ UUINavWidget* UUINavWidget::GetChildUINavWidget(const int ChildIndex)
 
 bool UUINavWidget::IsSelectorValid()
 {
-	return  TheSelector != nullptr &&
-			TheSelector->bIsEnabled;
-}
-
-bool UUINavWidget::IsButtonIndexValid(const int InButtonIndex) const
-{
-	return InButtonIndex >= 0 && InButtonIndex < UINavButtons.Num();
-}
-
-bool UUINavWidget::IsGridIndexValid(const int GridIndex) const
-{
-	return GridIndex >= 0 && GridIndex < NavigationGrids.Num();
+	return  TheSelector != nullptr && TheSelector->GetIsEnabled();
 }
 
 UUINavButton* UUINavWidget::FindNextButton(UUINavButton* Button, const ENavigationDirection Direction)
@@ -2986,7 +3099,7 @@ UUINavButton* UUINavWidget::FetchButtonByDirection(const ENavigationDirection Di
 
 UUINavButton * UUINavWidget::GetButtonAtIndex(const int InButtonIndex)
 {
-	if (!IsButtonIndexValid(InButtonIndex))
+	if (!UINavButtons.IsValidIndex(InButtonIndex))
 	{
 		return nullptr;
 	}
@@ -3002,7 +3115,7 @@ EButtonStyle UUINavWidget::GetStyleFromButtonState(UButton* Button)
 
 void UUINavWidget::GetGridAtIndex(const int GridIndex, FGrid& Grid, bool& IsValid)
 {
-	if (!IsGridIndexValid(GridIndex))
+	if (!NavigationGrids.IsValidIndex(GridIndex))
 	{
 		IsValid = false;
 	}
@@ -3016,18 +3129,18 @@ void UUINavWidget::GetGridAtIndex(const int GridIndex, FGrid& Grid, bool& IsVali
 int UUINavWidget::GetGridIndexFromWidgetObject(UWidget* Widget)
 {
 	int* GridIndex = GridIndexMap.Find(Widget);
-	return GridIndex == nullptr || !IsGridIndexValid(*GridIndex) ? -1 : *GridIndex;
+	return GridIndex == nullptr || !NavigationGrids.IsValidIndex(*GridIndex) ? -1 : *GridIndex;
 }
 
 void UUINavWidget::GetButtonGrid(const int InButtonIndex, FGrid & ButtonGrid, bool & IsValid)
 {
-	if (!IsButtonIndexValid(InButtonIndex))
+	if (!UINavButtons.IsValidIndex(InButtonIndex))
 	{
 		IsValid = false;
 	}
 	else
 	{
-		if (NavigationGrids.Num() > UINavButtons[InButtonIndex]->GridIndex)
+		if (NavigationGrids.IsValidIndex(UINavButtons[InButtonIndex]->GridIndex))
 		{
 			IsValid = true;
 			ButtonGrid = NavigationGrids[UINavButtons[InButtonIndex]->GridIndex];
@@ -3043,19 +3156,21 @@ void UUINavWidget::GetButtonGrid(const int InButtonIndex, FGrid & ButtonGrid, bo
 
 int UUINavWidget::GetButtonIndexInGrid(const int InButtonIndex)
 {
-	if (!IsButtonIndexValid(InButtonIndex)) return -1;
-	else return UINavButtons[InButtonIndex]->IndexInGrid;
+	if (!UINavButtons.IsValidIndex(InButtonIndex)) return -1;
+
+	return UINavButtons[InButtonIndex]->IndexInGrid;
 }
 
 int UUINavWidget::GetButtonGridIndex(const int InButtonIndex)
 {
-	if (!IsButtonIndexValid(InButtonIndex)) return -1;
-	else return UINavButtons[InButtonIndex]->GridIndex;
+	if (!UINavButtons.IsValidIndex(InButtonIndex)) return -1;
+	
+	return UINavButtons[InButtonIndex]->GridIndex;
 }
 
 int UUINavWidget::GetGridStartingIndex(const int GridIndex)
 {
-	if (!IsGridIndexValid(GridIndex)) return -1;
+	if (!NavigationGrids.IsValidIndex(GridIndex)) return -1;
 
 	if (NavigationGrids[GridIndex].FirstButton != nullptr)
 	{
@@ -3079,16 +3194,18 @@ int UUINavWidget::GetGridStartingIndex(const int GridIndex)
 			}
 		}
 	}
-	return -1;
+	return 0;
 }
 
 UUINavButton * UUINavWidget::GetButtonAtGridIndex(const int GridIndex, int IndexInGrid)
 {
-	if (!IsGridIndexValid(GridIndex)) return nullptr;
+	if (!NavigationGrids.IsValidIndex(GridIndex) || IndexInGrid < -1) return nullptr;
 
 	const FGrid& ButtonGrid = NavigationGrids[GridIndex];
 	if (ButtonGrid.FirstButton == nullptr) return nullptr;
-	if (IndexInGrid == -1) IndexInGrid = ButtonGrid.GetDimension() - 1;
+	const int ButtonGridDimension = ButtonGrid.GetDimension();
+	if (IndexInGrid >= ButtonGridDimension) return nullptr;
+	if (IndexInGrid == -1) IndexInGrid = ButtonGridDimension - 1;
 	const int NewIndex = ButtonGrid.FirstButton->ButtonIndex + IndexInGrid;
 
 	if (NewIndex >= UINavButtons.Num()) return nullptr;
@@ -3098,16 +3215,17 @@ UUINavButton * UUINavWidget::GetButtonAtGridIndex(const int GridIndex, int Index
 
 bool UUINavWidget::IsButtonInGrid(const int InButtonIndex, const int GridIndex)
 {
-	if (!IsButtonIndexValid(InButtonIndex)) return false;
-	else return UINavButtons[ButtonIndex]->GridIndex == GridIndex;
+	if (!UINavButtons.IsValidIndex(InButtonIndex)) return false;
+	
+	return UINavButtons[InButtonIndex]->GridIndex == GridIndex;
 }
 
 void UUINavWidget::GetButtonCoordinatesInGrid2D(const int InButtonIndex, int& XCoord, int& YCoord)
 {
 	XCoord = -1;
 	YCoord = -1;
-	if (!IsButtonIndexValid(InButtonIndex)) return;
-	const UUINavButton* Button = UINavButtons[ButtonIndex];
+	if (!UINavButtons.IsValidIndex(InButtonIndex)) return;
+	const UUINavButton* Button = UINavButtons[InButtonIndex];
 
 	const FGrid& Grid = NavigationGrids[Button->GridIndex];
 	if (Grid.GridType != EGridType::Grid2D) return;
@@ -3118,7 +3236,7 @@ void UUINavWidget::GetButtonCoordinatesInGrid2D(const int InButtonIndex, int& XC
 
 UUINavButton * UUINavWidget::GetButtonFromCoordinatesInGrid2D(const int GridIndex, const int XCoord, const int YCoord)
 {
-	if (!IsGridIndexValid(GridIndex)) return nullptr;
+	if (!NavigationGrids.IsValidIndex(GridIndex)) return nullptr;
 
 	const FGrid& Grid = NavigationGrids[GridIndex];
 	if (Grid.GridType != EGridType::Grid2D ||
@@ -3152,7 +3270,7 @@ int UUINavWidget::GetCollectionFirstButtonIndex(UUINavCollection * Collection, c
 
 UUINavComponent * UUINavWidget::GetUINavComponentAtIndex(const int Index)
 {
-	if (!IsButtonIndexValid(Index)) return nullptr;
+	if (!UINavButtons.IsValidIndex(Index)) return nullptr;
 	return UINavButtons[Index]->NavComp;
 }
 
@@ -3163,7 +3281,7 @@ UUINavHorizontalComponent * UUINavWidget::GetUINavHorizontalCompAtIndex(const in
 
 void UUINavWidget::HoverEvent(int Index)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index)) return;
 	
 	if ((OuterUINavWidget != nullptr || ChildUINavWidgets.Num() > 0) &&
 		UINavPC != nullptr && !UINavPC->ShouldIgnoreHoverEvents())
@@ -3182,18 +3300,24 @@ void UUINavWidget::HoverEvent(int Index)
 		CancelRebind();
 	}
 
-	if (!UINavPC->AllowsDirectionalInput())
+	if (UINavPC == nullptr || !UINavPC->AllowsDirectionalInput())
 	{
 		return;
 	}
+
+	HoveredButtonIndex = Index;
 
 #if IS_VR_PLATFORM 
 	const bool bIsVR = UHeadMountedDisplayFunctionLibrary::IsHeadMountedDisplayEnabled();
 #else
 	const bool bIsVR = false;
 #endif
-
-	if (Index == ButtonIndex || (!bIsVR && UINavPC->GetCurrentInputType() != EInputType::Mouse && (!bUseLeftThumbstickAsMouse || !UINavPC->IsMovingLeftStick())))
+	
+	if (bForcingNavigation &&
+		((Index == ButtonIndex) ||
+		(!bIsVR &&
+		UINavPC->GetCurrentInputType() != EInputType::Mouse &&
+		((!bUseLeftThumbstickAsMouse && !UINavPC->bUseLeftThumbstickAsMouse) || !UINavPC->IsMovingLeftStick()))))
 	{
 		if (bUseButtonStates) RevertButtonStyle(Index);
 		return;
@@ -3205,7 +3329,7 @@ void UUINavWidget::HoverEvent(int Index)
 
 void UUINavWidget::UnhoverEvent(int Index)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index)) return;
 	
 	if (bIgnoreMouseEvent)
 	{
@@ -3218,9 +3342,18 @@ void UUINavWidget::UnhoverEvent(int Index)
 		CancelRebind();
 	}
 
-	if (bUseButtonStates)
+	if (!bShouldForceNavigation)
 	{
-		UUINavButton* ToButton = UINavButtons[Index];
+		DispatchNavigation(-1, true);
+		OnNavigate(ButtonIndex, -1);
+		CollectionNavigateTo(-1);
+	}
+
+	HoveredButtonIndex = -1;
+
+	if (bUseButtonStates && bForcingNavigation)
+	{
+		const UUINavButton* ToButton = UINavButtons[Index];
 		if (SelectedButtonIndex != ButtonIndex)
 		{
 			SwitchButtonStyle(ButtonIndex == Index ? EButtonStyle::Hovered : EButtonStyle::Normal, Index);
@@ -3232,7 +3365,7 @@ void UUINavWidget::UnhoverEvent(int Index)
 
 void UUINavWidget::PressEvent(int Index)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index) || UINavPC == nullptr) return;
 	
 	if (IsRebindingInput())
 	{
@@ -3255,7 +3388,7 @@ void UUINavWidget::PressEvent(int Index)
 
 void UUINavWidget::ReleaseEvent(int Index)
 {
-	if (!IsButtonIndexValid(Index)) return;
+	if (!UINavButtons.IsValidIndex(Index) || (!bHasNavigation && SelectCount == 0) || UINavPC == nullptr) return;
 	
 	if (bIgnoreMouseEvent)
 	{
@@ -3280,6 +3413,8 @@ void UUINavWidget::ReleaseEvent(int Index)
 
 void UUINavWidget::FinishPress(const bool bMouse)
 {
+	if (!IsValid(CurrentButton)) return;
+
 	SelectedButtonIndex = ButtonIndex;
 	SelectCount++;
 
@@ -3359,6 +3494,16 @@ void UUINavWidget::NavigateInDirection(const ENavigationDirection Direction)
 		CancelRebind();
 		return;
 	}
+	
+	if (!bForcingNavigation)
+	{
+		bForcingNavigation = true;
+		if (HoveredButtonIndex == -1)
+		{
+			NavigateTo(ButtonIndex, false, true);
+			return;
+		}
+	}
 
 	if (Direction == ENavigationDirection::None || UINavButtons.Num() == 0) return;
 
@@ -3414,13 +3559,19 @@ void UUINavWidget::MenuSelectPress()
 		return;
 	}
 
+	if (!bForcingNavigation && HoveredButtonIndex == -1)
+	{
+		bRestoreNavigation = true;
+		return;
+	}
+
 	if (CurrentButton != nullptr)
 	{
 		FinishPress(false);
 
 		if (SelectCount == 1)
 		{
-			USoundBase* PressSound = Cast<USoundBase>(CurrentButton->WidgetStyle.PressedSlateSound.GetResourceObject());
+			USoundBase* PressSound = Cast<USoundBase>(CurrentButton->GetStyle().PressedSlateSound.GetResourceObject());
 			if (PressSound != nullptr) PlaySound(PressSound);
 			bIgnoreMouseEvent = true;
 			CurrentButton->OnPressed.Broadcast();
@@ -3430,6 +3581,14 @@ void UUINavWidget::MenuSelectPress()
 
 void UUINavWidget::MenuSelectRelease()
 {
+	if (bRestoreNavigation)
+	{
+		bRestoreNavigation = false;
+		bForcingNavigation = true;
+		NavigateTo(ButtonIndex, false, true);
+		return;
+	}
+	
 	if (bMovingSelector)
 	{
 		HaltedIndex = SELECT_INDEX;
@@ -3440,11 +3599,25 @@ void UUINavWidget::MenuSelectRelease()
 
 void UUINavWidget::MenuReturnPress()
 {
+	if (!bForcingNavigation && HoveredButtonIndex == -1)
+	{
+		bRestoreNavigation = true;
+		return;
+	}
+	
 	bReturning = true;
 }
 
 void UUINavWidget::MenuReturnRelease()
 {
+	if (bRestoreNavigation)
+	{
+		bRestoreNavigation = false;
+		bForcingNavigation = true;
+		NavigateTo(ButtonIndex, false, true);
+		return;
+	}
+	
 	if (!bReturning) return;
 
 	if (IsRebindingInput())

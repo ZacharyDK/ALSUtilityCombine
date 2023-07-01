@@ -1,17 +1,19 @@
 {
 	"FileVersion": 3,
 	"Version": 1,
-	"VersionName": "2.21.2",
+	"VersionName": "2.26.4",
 	"FriendlyName": "UI Navigation",
 	"Description": "A plugin that allows you to easily setup mouse, keyboard and controller navigation in UMG, among other things.",
-	"Category": "Plugins",
+	"Category": "User Interface",
 	"CreatedBy": "Goncalo Marques",
 	"CreatedByURL": "https://goncasmage1.github.io/",
 	"DocsURL": "",
 	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/4601ff4d12fc4ed1a7418e1585374a48",
 	"SupportURL": "",
-	"EngineVersion": "5.0.0",
+	"EngineVersion": "5.2.0",
 	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
 	"Installed": true,
 	"Modules": [
 		{
@@ -21,20 +23,26 @@
 			"WhitelistPlatforms": [
 				"Win64",
 				"Linux",
-				"Mac",
-				"PS4",
-				"XboxOne",
-				"Switch"
+				"Mac"
 			],
 			"BlacklistPlatforms": [
 				"IOS",
 				"Android"
+			],
+			"AdditionalDependencies":[
+				"EnhancedInput"
 			]
 		},
 		{
 			"Name": "UINavigationEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
 		}
 	]
 }

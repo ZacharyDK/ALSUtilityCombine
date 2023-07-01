@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 #include "UINavSlider.h"
 #include "UINavMacros.h"
@@ -11,7 +11,7 @@ void UUINavSlider::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	bIsFocusable = false;
+	SetIsFocusable(false);
 
 	if (MinValue >= MaxValue)
 	{
@@ -32,7 +32,7 @@ void UUINavSlider::NativeConstruct()
 		NavSpinBox->SetMinValue(MinValue);
 		NavSpinBox->SetMaxSliderValue(MaxValue);
 		NavSpinBox->SetMaxValue(MaxValue);
-		NavSpinBox->ClearKeyboardFocusOnCommit = true;
+		NavSpinBox->SetClearKeyboardFocusOnCommit(true);
 		if (!NavSpinBox->OnValueChanged.IsBound())
 			NavSpinBox->OnValueCommitted.AddDynamic(this, &UUINavSlider::HandleOnSpinBoxValueChanged);
 	}
@@ -43,10 +43,10 @@ void UUINavSlider::NativeConstruct()
 
 	Difference = MaxValue - MinValue;
 	Slider->IsFocusable = false;
-	Slider->StepSize = Interval / Difference;
+	Slider->SetStepSize(Interval / Difference);
 
-	HandleDefaultColor = Slider->SliderHandleColor;
-	BarDefaultColor = Slider->SliderBarColor;
+	HandleDefaultColor = Slider->GetSliderHandleColor();
+	BarDefaultColor = Slider->GetSliderBarColor();
 
 	Update();
 }
@@ -55,19 +55,18 @@ void UUINavSlider::Update()
 {
 	Super::Update();
 
-	Slider->SetValue((float)OptionIndex / (float)GetMaxOptionIndex());
+	Slider->SetValue(static_cast<float>(OptionIndex) / static_cast<float>(GetMaxOptionIndex()));
 	FNumberFormattingOptions FormatOptions = FNumberFormattingOptions();
 	FormatOptions.MaximumFractionalDigits = MaxDecimalDigits;
 	FormatOptions.MinimumFractionalDigits = MinDecimalDigits;
 
-	const float Value = MinValue + Slider->Value * Difference;
+	const float Value = MinValue + Slider->GetValue() * Difference;
 	FText ValueText = FText::AsNumber(Value, &FormatOptions);
 	if (!bUseComma) ValueText = FText::FromString(ValueText.ToString().Replace(TEXT(","),TEXT(".")));
 
 	if (NavText != nullptr) NavText->SetText(ValueText);
 	if (NavSpinBox != nullptr)
 	{
-		bIgnoreSpinBoxCommit = true;
 		NavSpinBox->SetValue(Value);
 	}
 }
@@ -144,22 +143,17 @@ void UUINavSlider::HandleOnMouseCaptureEnd()
 
 void UUINavSlider::HandleOnSpinBoxValueChanged(float InValue, ETextCommit::Type CommitMethod)
 {
-	if (bIgnoreSpinBoxCommit)
-	{
-		bIgnoreSpinBoxCommit = false;
-		return;
-	}
 	OptionIndex = IndexFromValue(InValue);
 	Update();
 }
 
 float UUINavSlider::IndexFromPercent(const float Value)
 {
-	float Div = Value / Slider->StepSize;
+	float Div = Value / Slider->GetStepSize();
 	const int MaxOptionIndex = GetMaxOptionIndex();
 	if (Div > MaxOptionIndex) Div = MaxOptionIndex;
 
-	const int FlatDiv = (int)Div;
+	const int FlatDiv = FMath::RoundToInt(Div);
 	const float Decimal = Div - FlatDiv;
 	return Decimal < 0.5 ? FlatDiv : (FlatDiv + 1 <= MaxOptionIndex ? FlatDiv + 1 : MaxOptionIndex);
 }

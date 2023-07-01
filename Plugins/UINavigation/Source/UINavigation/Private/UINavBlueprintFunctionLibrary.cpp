@@ -5,11 +5,19 @@
 #include "GameFramework/GameUserSettings.h"
 #include "GameFramework/InputSettings.h"
 #include "UINavSettings.h"
+#include "UINavDefaultInputSettings.h"
 #include "UINavComponent.h"
 #include "UINavMacros.h"
+#include "InputAction.h"
+#include "EnhancedInputSubsystems.h"
+#include "Data/UINavEnhancedActionKeyMapping.h"
+#include "Framework/Application/SlateApplication.h"
 #if IS_VR_PLATFORM
 #include "IXRTrackingSystem.h"
 #endif
+#include "EnhancedInputComponent.h"
+#include "Components/InputComponent.h"
+#include "Misc/ConfigCacheIni.h"
 
 void UUINavBlueprintFunctionLibrary::SetSoundClassVolume(USoundClass * TargetClass, const float NewVolume)
 {
@@ -52,10 +60,57 @@ FString UUINavBlueprintFunctionLibrary::GetPostProcessSettings(const FString Var
 	return ValueReceived;
 }
 
-void UUINavBlueprintFunctionLibrary::ResetInputSettings()
+void UUINavBlueprintFunctionLibrary::ResetInputSettings(APlayerController* PC)
 {
-	UInputSettings* Settings = const_cast<UInputSettings*>(GetDefault<UInputSettings>());
-	UUINavSettings *MySettings = GetMutableDefault<UUINavSettings>();
+	if (IsValid(PC))
+	{
+		UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer());
+		if (PC->InputComponent->IsA<UEnhancedInputComponent>() && Subsystem != nullptr)
+		{
+			const UUINavDefaultInputSettings* DefaultUINavInputSettings = GetDefault<UUINavDefaultInputSettings>();
+			for (const TPair<TSoftObjectPtr<UInputMappingContext>, FInputMappingArray>& Entry : DefaultUINavInputSettings->DefaultEnhancedInputMappings)
+			{
+				UInputMappingContext* InputContext = Entry.Key.LoadSynchronous();
+
+				if (InputContext == nullptr)
+				{
+					continue;
+				}
+				
+				const FInputMappingArray& DefaultMappings = Entry.Value;
+				if (DefaultMappings.DefaultInputMappings.Num() == 0) continue;
+
+				InputContext->UnmapAll();
+
+				for (const FUINavEnhancedActionKeyMapping& DefaultInputMapping : DefaultMappings.DefaultInputMappings)
+				{
+					FEnhancedActionKeyMapping& NewMapping = InputContext->MapKey(DefaultInputMapping.Action.LoadSynchronous(), DefaultInputMapping.Key);
+
+					TArray<UInputModifier*> InputModifiers;
+					for (const TSoftObjectPtr<UInputModifier>& Modifier : DefaultInputMapping.Modifiers)
+					{
+						InputModifiers.Add(Modifier.LoadSynchronous());
+					}
+					NewMapping.Modifiers = InputModifiers;
+
+					TArray<UInputTrigger*> InputTriggers;
+					for (const TSoftObjectPtr<UInputTrigger>& Trigger : DefaultInputMapping.Triggers)
+					{
+						InputTriggers.Add(Trigger.LoadSynchronous());
+					}
+					NewMapping.Triggers = InputTriggers;
+				}
+			}
+
+			FModifyContextOptions ModifyOptions;
+			ModifyOptions.bForceImmediately = true;
+			Subsystem->RequestRebuildControlMappings(ModifyOptions);
+			
+			return;
+		}
+	}
+	UInputSettings* Settings = GetMutableDefault<UInputSettings>();
+	UUINavDefaultInputSettings* DefaultUINavInputSettings = GetMutableDefault<UUINavDefaultInputSettings>();
 
 	//Remove old mappings
 	TArray<FInputActionKeyMapping> OldActionMappings = Settings->GetActionMappings();
@@ -70,11 +125,11 @@ void UUINavBlueprintFunctionLibrary::ResetInputSettings()
 	}
 
 	//Add new ones
-	for (FInputActionKeyMapping Mapping : MySettings->ActionMappings)
+	for (FInputActionKeyMapping Mapping : DefaultUINavInputSettings->DefaultActionMappings)
 	{
 		Settings->AddActionMapping(Mapping, false);
 	}
-	for (FInputAxisKeyMapping Mapping : MySettings->AxisMappings)
+	for (FInputAxisKeyMapping Mapping : DefaultUINavInputSettings->DefaultAxisMappings)
 	{
 		Settings->AddAxisMapping(Mapping, false);
 	}
@@ -123,19 +178,32 @@ bool UUINavBlueprintFunctionLibrary::IsGamepadConnected()
 	return FSlateApplication::Get().IsGamepadAttached();
 }
 
+bool UUINavBlueprintFunctionLibrary::IsUINavInputAction(const UInputAction* const InputAction)
+{
+	const UUINavSettings* const UINavSettings = GetDefault<UUINavSettings>();
+	const UUINavEnhancedInputActions* const InputActions = UINavSettings->EnhancedInputActions.LoadSynchronous();
+		
+	return (InputActions == nullptr ||
+			InputAction == InputActions->IA_MenuUp ||
+			InputAction == InputActions->IA_MenuDown ||
+			InputAction == InputActions->IA_MenuLeft ||
+			InputAction == InputActions->IA_MenuRight ||
+			InputAction == InputActions->IA_MenuSelect ||
+			InputAction == InputActions->IA_MenuReturn ||
+			InputAction == InputActions->IA_MenuNext ||
+			InputAction == InputActions->IA_MenuPrevious);
+}
+
 int UUINavBlueprintFunctionLibrary::GetGridDimension(const FGrid Grid)
 {
 	switch (Grid.GridType)
 	{
 		case EGridType::Horizontal:
 			return Grid.DimensionX;
-			break;
 		case EGridType::Vertical:
 			return Grid.DimensionY;
-			break;
 		case EGridType::Grid2D:
 			return Grid.NumGrid2DButtons;
-			break;
 	}
 	return 0;
 }

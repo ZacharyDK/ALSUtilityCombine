@@ -27,7 +27,7 @@ int FGrid::GetLastButtonIndex() const
 
 UUINavButton::UUINavButton()
 {
-	IsFocusable = false;
+	InitIsFocusable(false);
 	OnHovered.AddDynamic(this, &UUINavButton::OnHover);
 	OnUnhovered.AddDynamic(this, &UUINavButton::OnUnhover);
 	OnClicked.AddDynamic(this, &UUINavButton::OnClick);
@@ -37,9 +37,9 @@ UUINavButton::UUINavButton()
 
 bool UUINavButton::IsValid(const bool bIgnoreDisabledUINavButton) const
 {
-	return (Visibility != ESlateVisibility::Collapsed &&
-			Visibility != ESlateVisibility::Hidden &&
-			(!bIgnoreDisabledUINavButton || bIsEnabled));
+	return (GetVisibility() != ESlateVisibility::Collapsed &&
+		GetVisibility() != ESlateVisibility::Hidden &&
+		(!bIgnoreDisabledUINavButton || GetIsEnabled()));
 }
 
 void UUINavButton::OnHover()
@@ -66,6 +66,3 @@ void UUINavButton::OnRelease()
 {
 	CustomRelease.Broadcast(ButtonIndex);
 }
-
-
-

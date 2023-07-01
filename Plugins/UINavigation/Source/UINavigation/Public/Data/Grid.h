@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
+// Copyright (C) 2019 GonÃ§alo Marques - All Rights Reserved
 
 #pragma once
 #include "GridType.h"
@@ -101,27 +101,28 @@ struct FGrid
 			EdgeNavigation.DownButton = nullptr;
 	}
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = ButtonGrid)
-		EGridType GridType = EGridType::Horizontal;
-
-	UPROPERTY(BlueprintReadOnly, Category = ButtonGrid)
-		UUINavButton* FirstButton = nullptr;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = ButtonGrid)
-		FButtonNavigation EdgeNavigation;
+	EGridType GridType = EGridType::Horizontal;
 
 	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
-		bool bWrap = false;
+	UUINavButton* FirstButton = nullptr;
 
-	UPROPERTY(BlueprintReadOnly, Category = ButtonGrid)
-		int GridIndex = -1;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = ButtonGrid)
+	FButtonNavigation EdgeNavigation;
 
-	UPROPERTY(BlueprintReadOnly, Category = ButtonGrid)
-		int DimensionX = -1;
-	UPROPERTY(BlueprintReadOnly, Category = ButtonGrid)
-		int DimensionY = -1;
+	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
+	bool bWrap = false;
 
-	UPROPERTY(BlueprintReadOnly, Category = ButtonGrid)
-		int NumGrid2DButtons = -1;
+	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
+	int GridIndex = -1;
+
+	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
+	int DimensionX = -1;
+
+	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
+	int DimensionY = -1;
+
+	UPROPERTY(BlueprintReadWrite, Category = ButtonGrid)
+	int NumGrid2DButtons = -1;
 
 };

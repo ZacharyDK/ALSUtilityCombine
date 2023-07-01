@@ -1,15 +1,17 @@
-﻿// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+﻿// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 #pragma once
 
 #include "UObject/NoExportTypes.h"
 #include "GameFramework/PlayerInput.h"
+#include "InputMappingContext.h"
+#include "Data/UINavEnhancedInputActions.h"
 #include "UINavSettings.generated.h"
 
 /**
  * 
  */
-UCLASS(config = UINavInput, defaultconfig)
+UCLASS(config = UINavSettings, defaultconfig)
 class UINAVIGATION_API UUINavSettings : public UObject
 {
 	GENERATED_BODY()
@@ -23,15 +25,15 @@ class UINAVIGATION_API UUINavSettings : public UObject
 	
 public:
 
-	UPROPERTY(config, EditAnywhere, Category = "UINavSettings")
-		bool bIgnoreDisabledUINavButton;
+	UPROPERTY(config, EditAnywhere, Category = "Settings")
+	bool bIgnoreDisabledUINavButton;
 	
-	UPROPERTY(config, EditAnywhere, Category = "UINavSettings")
-		bool bRemoveWidgetOnReturn;
+	UPROPERTY(config, EditAnywhere, Category = "Settings")
+	bool bRemoveWidgetOnReturn;
 
 	UPROPERTY(config, EditAnywhere, Category = "Bindings")
-		TArray<struct FInputActionKeyMapping> ActionMappings;
+	TSoftObjectPtr<UInputMappingContext> EnhancedInputContext = TSoftObjectPtr<UInputMappingContext>(FSoftObjectPath("/UINavigation/Input/IC_UINav.IC_UINav"));
 
 	UPROPERTY(config, EditAnywhere, Category = "Bindings")
-		TArray<struct FInputAxisKeyMapping> AxisMappings;
+	TSoftObjectPtr<UUINavEnhancedInputActions> EnhancedInputActions = TSoftObjectPtr<UUINavEnhancedInputActions>(FSoftObjectPath("/UINavigation/Input/UINavEnhancedInputActions.UINavEnhancedInputActions"));
 };

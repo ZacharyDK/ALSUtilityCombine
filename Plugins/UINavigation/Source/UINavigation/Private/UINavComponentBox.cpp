@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
+// Copyright (C) 2019 GonÃ§alo Marques - All Rights Reserved
 
 #include "UINavComponentBox.h"
 #include "UINavMacros.h"
@@ -10,7 +10,7 @@ void UUINavComponentBox::NativeConstruct()
 	BaseConstruct();
 
 	if (!LeftButton->OnClicked.IsBound())
-		LeftButton->OnClicked.AddDynamic(this, &UUINavComponentBox::NavigateLeft);
+		LeftButton->OnClicked.AddDynamic(this, &UUINavComponentBox::NavigateLeft);	
 	if (!RightButton->OnClicked.IsBound())
 		RightButton->OnClicked.AddDynamic(this, &UUINavComponentBox::NavigateRight);
 }
@@ -22,11 +22,13 @@ void UUINavComponentBox::BaseConstruct()
 	if (MinRange >= MaxRange) DISPLAYERROR(TEXT("MinRange has to be smaller that MaxRange"));
 	if (Interval <= 0) DISPLAYERROR(TEXT("Interval must be at least 1"));
 
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	if (LeftButton == nullptr) DISPLAYERROR(TEXT("Couldn't find Button named LeftButton in UINavOptionBox"));
 	else LeftButton->IsFocusable = false;
 
 	if (RightButton == nullptr) DISPLAYERROR(TEXT("Couldn't find Button named RightButton in UINavOptionBox"));
 	else RightButton->IsFocusable = false;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	if (NavText == nullptr) DISPLAYERROR(TEXT("Couldn't find TextBlock named NavText in UINavOptionBox"));
 
@@ -41,13 +43,13 @@ void UUINavComponentBox::BaseConstruct()
 void UUINavComponentBox::CheckLeftLimit()
 {
 	if (bLoopOptions) return;
-	if (OptionIndex == 0) LeftButton->SetIsEnabled(false);
+	if (OptionIndex <= 0) LeftButton->SetIsEnabled(false);
 }
 
 void UUINavComponentBox::CheckRightLimit()
 {
 	if (bLoopOptions) return;
-	if (OptionIndex == GetMaxOptionIndex()) RightButton->SetIsEnabled(false);
+	if (OptionIndex >= GetMaxOptionIndex()) RightButton->SetIsEnabled(false);
 }
 
 void UUINavComponentBox::UpdateTextToIndex(const int NewIndex)
@@ -55,8 +57,8 @@ void UUINavComponentBox::UpdateTextToIndex(const int NewIndex)
 	Super::UpdateTextToIndex(NewIndex);
 
 	if (!bDisableButtons || bLoopOptions) return;
-	if (!RightButton->bIsEnabled) RightButton->SetIsEnabled(true);
-	if (!LeftButton->bIsEnabled) LeftButton->SetIsEnabled(true);
+	if (!RightButton->GetIsEnabled()) RightButton->SetIsEnabled(true);
+	if (!LeftButton->GetIsEnabled()) LeftButton->SetIsEnabled(true);
 	CheckLeftLimit();
 	CheckRightLimit();
 }
@@ -102,7 +104,7 @@ void UUINavComponentBox::FinishNavigateLeft(const bool bOptionChanged)
 
 	CheckLeftLimit();
 	//Enable button if previously disabled
-	if (!RightButton->bIsEnabled) RightButton->SetIsEnabled(true);
+	if (!RightButton->GetIsEnabled() && GetMaxOptionIndex() > 0) RightButton->SetIsEnabled(true);
 
 	if (bOptionChanged)
 	{
@@ -130,7 +132,7 @@ void UUINavComponentBox::FinishNavigateRight(const bool bOptionChanged)
 
 	CheckRightLimit();
 	//Enable button if previously disabled
-	if (!LeftButton->bIsEnabled) LeftButton->SetIsEnabled(true);
+	if (!LeftButton->GetIsEnabled() && GetMaxOptionIndex() > 0) LeftButton->SetIsEnabled(true);
 
 	if (bOptionChanged)
 	{

@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
+// Copyright (C) 2019 GonÃ§alo Marques - All Rights Reserved
 
 #include "UINavSliderBox.h"
 #include "UINavWidget.h"
@@ -30,5 +30,5 @@ void UUINavSliderBox::Update()
 
 float UUINavSliderBox::GetSliderPercent() const
 {
-	return SliderBar->Percent;
+	return SliderBar->GetPercent();
 }

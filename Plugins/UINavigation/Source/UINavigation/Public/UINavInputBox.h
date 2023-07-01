@@ -1,21 +1,22 @@
-﻿// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+﻿// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 #pragma once
 
 #include "Blueprint/UserWidget.h"
 #include "Data/AxisType.h"
-#include "Data/InputIconMapping.h"
-#include "Data/InputNameMapping.h"
+#include "Data/InputContainerEnhancedActionData.h"
 #include "Data/InputRebindData.h"
 #include "Data/RevertRebindReason.h"
+#include "EnhancedActionKeyMapping.h"
 #include "UINavInputBox.generated.h"
 
 #define IS_AXIS (AxisType != EAxisType::None)
-#define IS_POSITIVE_AXIS (AxisType == EAxisType::Positive)
-#define IS_NEGATIVE_AXIS (AxisType == EAxisType::Negative)
-#define IS_SCALE_CORRECT(AxisMapping) ((TempAxes[i].Scale > 0.0f && IS_POSITIVE_AXIS) || (TempAxes[i].Scale < 0.0f && IS_NEGATIVE_AXIS))
-#define IS_RIGHT_SCALE(Axis) ((Axis.Scale > 0.0f && IS_POSITIVE_AXIS) || (Axis.Scale < 0.0f && IS_NEGATIVE_AXIS))
-#define GET_REVERSE_AXIS (AxisType == EAxisType::Positive ? EAxisType::Negative : EAxisType::Positive)
+
+class UUINavInputComponent;
+class UInputAction;
+class UInputMappingContext;
+class UInputSettings;
+struct FInputAxisKeyMapping;
 
 /**
 * This class contains the logic for rebinding input keys to their respective actions
@@ -39,16 +40,31 @@ protected:
 	void UpdateKeyDisplay(const int Index);
 	FKey GetKeyFromAxis(FKey AxisKey) const;
 	void ProcessInputName();
+	int GetNumValidKeys(const int Index) const;
+
+	void GetEnhancedMappingsForAction(const UInputAction* Action, const EInputAxis& Axis, const int Index, TArray<int32>& OutMappingIndices);
+	void GetMappingsForAction(const UInputSettings* const Settings, const FName ActionName, const int Index, TArray<int32>& OutMappingIndices);
+	void GetMappingsForAxis(const UInputSettings* const Settings, const FName AxisName, const bool bPositive, const int Index, TArray<int32>& OutMappingIndices);
 
 public:
 
 	virtual void NativeConstruct() override;
+	void CreateEnhancedInputKeyWidgets();
+	void CreateInputKeyWidgets();
 
 	void CreateKeyWidgets();
-	bool TrySetupNewKey(FKey NewKey, int KeyIndex, class UUINavInputComponent* NewInputButton);
+	bool TrySetupNewKey(const FKey NewKey, const int KeyIndex, const UUINavInputComponent* const NewInputButton);
 	void ResetKeyWidgets();
 	void UpdateInputKey(const FKey NewKey, const int Index, const bool bSkipChecks = false);
-	void FinishUpdateInputKey();
+	void FinishUpdateNewKey();
+	void FinishUpdateNewEnhancedInputKey(const FKey PressedKey, int Index);
+	void FinishUpdateNewInputKey(const FKey PressedKey, int Index);
+	void TryMapEnhancedAxisKey(const FKey& NewKey, const int32 Index);
+	void TryMapInputAxisKey(UInputSettings* Settings, const FKey& NewKey, const int32 Index);
+	void TryMap2DAxisKey(const FKey& NewMappingKey, const int Index);
+	void UnmapEnhancedAxisKey(const FKey& NewAxisKey, const FKey& OldAxisKey, const FKey& NewKey, const int32 Index);
+	void UnmapInputAxisKey(UInputSettings* Settings, const FKey& NewAxisKey, const FKey& OldAxisKey, const FInputAxisKeyMapping& AxisMapping, const int32 Index);
+	void AddRelevantModifiers(const FInputContainerEnhancedActionData& ActionData, FEnhancedActionKeyMapping& Mapping);
 	void CancelUpdateInputKey(const ERevertRebindReason Reason);
 	void RevertToKeyText(const int Index);
 
@@ -56,25 +72,38 @@ public:
 
 	int ContainsKey(const FKey CompareKey) const;
 	FORCEINLINE bool IsAxis() const { return IS_AXIS; }
+	FORCEINLINE bool WantsAxisKey() const;
 	FORCEINLINE FKey GetKey(const int Index) { return Index >= 0 && Index < Keys.Num() ? Keys[Index] : FKey(); }
 
 	EAxisType AxisType = EAxisType::None;
 
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "UINav Input")
-		class UUINavInputComponent* InputButton1;
+	class UUINavInputComponent* InputButton1 = nullptr;
+		
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "UINav Input")
-		class UUINavInputComponent* InputButton2;
+	class UUINavInputComponent* InputButton2 = nullptr;
+		
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "UINav Input")
-		class UUINavInputComponent* InputButton3;
+	class UUINavInputComponent* InputButton3 = nullptr;
 
 	TArray<class UUINavInputComponent*> InputButtons;
 
 	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "UINav Input")
-		class UTextBlock* InputText;
+	class UTextBlock* InputText = nullptr;
 
-	class UUINavInputContainer* Container;
+	UPROPERTY()
+	class UUINavInputContainer* Container = nullptr;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Input")
 	FName InputName;
+	TArray<int> EnhancedInputGroups;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Enhanced Input")
+	UInputMappingContext* InputContext = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Enhanced Input")
+	FInputContainerEnhancedActionData InputActionData;
+	
 	FInputRebindData InputData = FInputRebindData();
 
 	int KeysPerInput = 2;

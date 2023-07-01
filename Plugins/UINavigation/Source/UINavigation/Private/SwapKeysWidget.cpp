@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+﻿// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 #include "SwapKeysWidget.h"
 #include "UINavInputBox.h"
@@ -20,7 +20,7 @@ void USwapKeysWidget::NotifySwapResult(const int Index)
 	{
 		if (Index > 0)
 		{
-			CurrentInputBox->FinishUpdateInputKey();
+			CurrentInputBox->FinishUpdateNewKey();
 			CollidingInputBox->UpdateInputKey(InputCollisionData.CurrentInputKey,
 											  InputCollisionData.CollidingKeyIndex,
 											  true);

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2019 Gon�alo Marques - All Rights Reserved
+﻿// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
 
 
 #include "UINavPCReceiver.h"
@@ -11,8 +11,11 @@ void IUINavPCReceiver::OnInputChanged_Implementation(EInputType From, EInputType
 {
 }
 
-void IUINavPCReceiver::OnActiveWidgetChanged_Implementation(UUINavWidget* OldActiveWidget,
-	UUINavWidget* NewActiveWidget)
+void IUINavPCReceiver::OnControllerConnectionChanged_Implementation(EInputDeviceConnectionState InputDeviceConnectionState, FPlatformUserId PlatformUserId, FInputDeviceId InputDeviceId)
+{
+}
+
+void IUINavPCReceiver::OnActiveWidgetChanged_Implementation(UUINavWidget* OldActiveWidget, UUINavWidget* NewActiveWidget)
 {
 }
 

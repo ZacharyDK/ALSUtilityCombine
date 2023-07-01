@@ -1,4 +1,4 @@
-// Copyright (C) 2019 Gonçalo Marques - All Rights Reserved
+// Copyright (C) 2019 GonÃ§alo Marques - All Rights Reserved
 
 #include "UINavOptionBox.h"
 #include "Blueprint/WidgetTree.h"
@@ -12,6 +12,7 @@ void UUINavOptionBox::NativeConstruct()
 
 	if (!LeftButton->OnClicked.IsBound())
 		LeftButton->OnClicked.AddDynamic(this, &UUINavOptionBox::NavigateLeft);
+	
 	if (!RightButton->OnClicked.IsBound())
 		RightButton->OnClicked.AddDynamic(this, &UUINavOptionBox::NavigateRight);
 }
@@ -24,12 +25,7 @@ int UUINavOptionBox::GetMaxOptionIndex() const
 	}
 	else
 	{
-		if (StringOptions.Num() > 0) return StringOptions.Num() - 1;
-		else
-		{
-			DISPLAYERROR(TEXT("StringOptions needs to have at least 2 options"));
-			return 0;
-		}
+		return StringOptions.Num() - 1;
 	}
 }
 
@@ -39,6 +35,6 @@ void UUINavOptionBox::Update()
 
 	NavText->SetText(bUseNumberRange ? 
 		FText::FromString(FString::FromInt(MinRange + OptionIndex*Interval)) : 
-		StringOptions.Num() > OptionIndex ? StringOptions[OptionIndex] : FText());
+		StringOptions.IsValidIndex(OptionIndex) ? StringOptions[OptionIndex] : FText());
 }
 
